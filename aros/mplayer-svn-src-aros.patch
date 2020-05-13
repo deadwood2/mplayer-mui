@@ -1,0 +1,2963 @@
+diff -ur -x.svn mplayer-svn-src/configure mplayer-svn-src-aros/configure
+--- mplayer-svn-src/configure	2012-04-15 21:43:24.000000000 +0200
++++ mplayer-svn-src-aros/configure	2012-04-16 19:18:01.000000000 +0200
+@@ -224,6 +224,7 @@
+ }
+ aix()       { issystem "AIX"; }
+ amigaos()   { issystem "AmigaOS"; }
++aros()      { issystem "AROS"; }
+ bsdos()     { issystem "BSD/OS"; }
+ cygwin()    { issystem "CYGWIN"; }
+ darwin()    { issystem "Darwin"; }
+@@ -1534,6 +1535,7 @@
+       amigaos) system_name=AmigaOS ;;
+       mingw32*) system_name=MINGW32 ;;
+       wine) system_name=Wine ;;
++      aros) system_name=AROS ;;
+     esac
+   done
+   # We need to convert underscores so that values like k6-2 and pentium-mmx can be passed
+@@ -1591,6 +1593,20 @@
+   extra_cflags="-DNEWLIB -D__USE_INLINE__ $extra_cflags"
+ fi
+ 
++if aros ; then
++  extra_cflags="-nix -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -Iaros/include -Ilibdvdnav $extra_cflags"
++  extra_ldflags="$extra_ldflags -nix -L./aros/obj -lmissing -lcybergraphics"
++  _aros_common=yes
++  _cgx_common=yes
++  _cgx_wpa=yes
++  _ahi_dev=yes
++  _bindir="PROGDIR:"
++  _datadir="PROGDIR:conf"
++  _mandir="PROGDIR:man"
++  _confdir="PROGDIR:conf"
++  _libdir="PROGDIR:"
++fi
++
+ if qnx ; then
+   extra_ldflags="$extra_ldflags -lph"
+ fi
+@@ -3154,12 +3170,22 @@
+ 
+ 
+ echocheck "socklib"
++if aros ; then
++cat > $TMPC << EOF
++#include <netdb.h>
++#include <proto/socket.h>
++#include <sys/socket.h>
++struct Library * SocketBase = NULL;
++int main(void) { (void) gethostbyname(0); (void) socket(AF_INET, SOCK_STREAM, 0); return 0; }
++EOF
++else
+ # for Solaris (socket stuff is in -lsocket, gethostbyname and friends in -lnsl):
+ cat > $TMPC << EOF
+ #include <netdb.h>
+ #include <sys/socket.h>
+ int main(void) { gethostbyname(0); socket(AF_INET, SOCK_STREAM, 0); return 0; }
+ EOF
++fi
+ _socklib=no
+ for ld_tmp in "" "-lsocket -ldnet" "-lsocket -lnsl" "-lnsl" "-lsocket" ; do
+   cc_check $ld_tmp && ld_sock="$ld_tmp" && _socklib=yes && break
+@@ -3292,11 +3318,16 @@
+ echores "$_struct_sockaddr_sa_len"
+ 
+ 
++# AROS: Check modified to include <sys/socket.h>
+ echocheck "arpa/inet.h"
+ arpa_inet_h=no
+ def_arpa_inet_h='#define HAVE_ARPA_INET_H 0'
+-header_check arpa/inet.h && arpa_inet_h=yes &&
+-  def_arpa_inet_h='#define HAVE_ARPA_INET_H 1'
++cat > $TMPC << EOF
++#include <sys/socket.h>
++#include <arpa/inet.h>
++int main(void) { return 0; }
++EOF
++cc_check && arpa_inet_h=yes && def_arpa_inet_h='#define HAVE_ARPA_INET_H 1'
+ echores "$arpa_inet_h"
+ 
+ 
+@@ -3353,6 +3384,9 @@
+ echocheck "networking"
+ test $_winsock2_h = no && test $inet_pton = no &&
+   test $inet_aton = no && networking=no
++if aros ; then
++networking=yes
++fi
+ if test "$networking" = yes ; then
+   def_network='#define CONFIG_NETWORK 1'
+   def_networking='#define CONFIG_NETWORKING 1'
+@@ -5676,11 +5710,13 @@
+   test $(uname -r | sed 's/^5\.//') -gt 10 && default_cdrom_device="/cdrom/cdrom0"
+ elif amigaos ; then
+   default_cdrom_device="a1ide.device:2"
++elif aros ; then
++  default_cdrom_device="ata.device:2"
+ else
+   default_cdrom_device="/dev/cdrom"
+ fi
+ 
+-if win32 || os2 || dragonfly || freebsd || openbsd || sunos || amigaos ; then
++if win32 || os2 || dragonfly || freebsd || openbsd || sunos || amigaos || aros ; then
+   default_dvd_device=$default_cdrom_device
+ elif darwin ; then
+   default_dvd_device="/dev/rdiskN"
+@@ -5692,7 +5728,7 @@
+ echocheck "VCD support"
+ if test "$_vcd" = auto; then
+   _vcd=no
+-  if linux || freebsd || netbsd || openbsd || dragonfly || bsdos || darwin || sunos || os2; then
++  if linux || freebsd || netbsd || openbsd || dragonfly || bsdos || darwin || sunos || os2 ; then
+     _vcd=yes
+   elif mingw32; then
+   header_check ddk/ntddcdrm.h && _vcd=yes
+@@ -5736,6 +5772,10 @@
+     _dvdread_internal=yes
+     _dvdread=yes
+     extra_cflags="-Ilibdvdread4 $extra_cflags"
++  elif aros ; then
++    _dvdread_internal=yes
++    _dvdread=yes
++    extra_cflags="-Ilibdvdread4 $extra_cflags"
+   fi
+ elif test "$_dvdread" = auto ; then
+   _dvdread=no
+@@ -5878,6 +5918,8 @@
+ fi
+ echores "$_bitmap_font"
+ 
++if aros ; then
++#FreeType AROS check
+ 
+ echocheck "freetype >= 2.0.9"
+ 
+@@ -5888,6 +5930,125 @@
+ fi
+ 
+ if test "$_freetype" = auto ; then
++
++   cat > $TMPC << EOF
++#include <stdio.h>
++#include <ft2build.h>
++#include FT_FREETYPE_H
++#if ((FREETYPE_MAJOR < 2) || ((FREETYPE_MINOR == 0) && (FREETYPE_PATCH < 9)))
++#error "Need FreeType 2.0.9 or newer"
++#endif
++int main(void) {
++    FT_Library library;
++    FT_Int major=-1,minor=-1,patch=-1;
++    int err=FT_Init_FreeType(&library);
++    return 0;
++}
++EOF
++   _freetype=no
++   cc_check -lfreetype2 && _freetype=yes
++fi
++if test "$_freetype" = yes ; then
++    def_freetype='#define CONFIG_FREETYPE 1'
++    extra_ldflags="$extra_ldflags -lfreetype2"
++else
++    def_freetype='#undef CONFIG_FREETYPE'
++fi
++echores "$_freetype"
++
++if test "$_freetype" = no ; then
++    _fontconfig=no
++    _res_comment="FreeType support needed"
++fi
++echocheck "fontconfig"
++if test "$_fontconfig" = auto ; then
++        cat > $TMPC << EOF
++#include <stdio.h>
++#include <stdlib.h>
++#include <fontconfig/fontconfig.h>
++#if FC_VERSION < 20402
++#error At least version 2.4.2 of fontconfig required
++#endif
++int main(void) {
++    int err = FcInit();
++    if (err == FcFalse) {
++        printf("Couldn't initialize fontconfig lib\n");
++        exit(err);
++    }
++    return 0;
++}
++EOF
++  _fontconfig=no
++  for _ld_tmp in "" "-lexpat -lfreetype" "-lexpat -lfreetype -lz" "-lexpat -lfreetype -lz -liconv" ; do
++    _ld_tmp="-lfontconfig $_ld_tmp"
++    cc_check $_ld_tmp && _fontconfig=yes && extra_ldflags="$extra_ldflags $_ld_tmp" && break
++  done
++  if test "$_fontconfig" = no && $_pkg_config --exists fontconfig ; then
++    _inc_tmp=$($_pkg_config --cflags fontconfig)
++    _ld_tmp=$($_pkg_config --libs fontconfig)
++    cc_check $_inc_tmp $_ld_tmp && _fontconfig=yes \
++      && extra_ldflags="$extra_ldflags $_ld_tmp" && extra_cflags="$extra_cflags $_inc_tmp"
++  fi
++fi
++if test "$_fontconfig" = yes ; then
++    def_fontconfig='#define CONFIG_FONTCONFIG 1'
++else
++    def_fontconfig='#undef CONFIG_FONTCONFIG'
++fi
++echores "$_fontconfig"
++
++
++echocheck "SSA/ASS support"
++# libass depends on FreeType
++if test "$_freetype" = no ; then
++    _ass=no
++    ass_internal=no
++    _res_comment="FreeType support needed"
++fi
++
++if test "$_ass" = auto ; then
++    cat > $TMPC << EOF
++#include <ft2build.h>
++#include FT_FREETYPE_H
++#if ((FREETYPE_MAJOR < 2) || (FREETYPE_MINOR < 2) || ((FREETYPE_MINOR == 2) && (FREETYPE_PATCH < 1)))
++#error "Need FreeType 2.2.1 or newer"
++#endif
++int main(void) { return 0; }
++EOF
++    _ass=no
++    cc_check && _ass=yes
++    if test "$_ass" = no ; then
++        ass_internal=no
++        _res_comment="FreeType >= 2.2.1 needed"
++    elif test "$ass_internal" = no ; then
++        _res_comment="external"
++        extra_ldflags="$extra_ldflags -lass"
++    fi
++fi
++if test "$_ass" = yes ; then
++    def_ass='#define CONFIG_ASS 1'
++else
++    def_ass='#undef CONFIG_ASS'
++fi
++if test "$ass_internal" = yes ; then
++    def_ass_internal='#define CONFIG_ASS_INTERNAL 1'
++else
++    def_ass_internal='#undef CONFIG_ASS_INTERNAL'
++fi
++echores "$_ass"
++
++else
++#FreeType regular check
++
++echocheck "freetype >= 2.0.9"
++
++# freetype depends on iconv
++if test "$_iconv" = no ; then
++    _freetype=no
++    _res_comment="iconv support needed"
++fi
++
++if test "$_freetype" = auto ; then
+     if ( $_freetypeconfig --version ) >/dev/null 2>&1 ; then
+         cat > $TMPC << EOF
+ #include <stdio.h>
+@@ -6044,6 +6205,7 @@
+     ass_internal=no
+ fi
+ echores "$_ass"
++fi
+ 
+ 
+ echocheck "ENCA"
+@@ -7441,7 +7603,11 @@
+   fi
+   test "$_freetype" = no && test "$_bitmap_font" = no &&
+     die "The GUI requires either FreeType or bitmap font support."
+-if ! win32 ; then
++if aros ; then
++  _gui_mui=yes
++  libs_mplayer="$libs_mplayer -lmui"
++  def_gui='#define CONFIG_GUI 1'
++elif ! win32 ; then
+   _gui_gtk=yes
+   test "$_x11" != yes && die "X11 support required for GUI compilation."
+ 
+@@ -8022,16 +8188,20 @@
+ # features
+ 3DFX = $_3dfx
+ AA = $_aa
++AHI_DEV = $_ahi_dev
+ ALSA = $_alsa
+ APPLE_IR = $_apple_ir
+ APPLE_REMOTE = $_apple_remote
+ ARTS = $_arts
++AROS_COMMON = $_aros_common
+ AUDIO_INPUT = $_audio_input
+ BITMAP_FONT = $_bitmap_font
+ BL = $_bl
+ CACA = $_caca
+ CDDA = $_cdda
+ CDDB = $_cddb
++CGX_COMMON = $_cgx_common
++CGX_WPA = $_cgx_wpa
+ COREAUDIO = $_coreaudio
+ COREVIDEO = $_corevideo
+ DART = $_dart
+@@ -8063,6 +8233,7 @@
+ MATRIXVIEW = $matrixview
+ GUI = $_gui
+ GUI_GTK = $_gui_gtk
++GUI_MUI = $_gui_mui
+ GUI_WIN32 = $_gui_win32
+ HAVE_POSIX_SELECT = $_posix_select
+ HAVE_SYS_MMAN_H = $_mman
+diff -ur -x.svn mplayer-svn-src/cpudetect.c mplayer-svn-src-aros/cpudetect.c
+--- mplayer-svn-src/cpudetect.c	2012-04-15 21:43:24.000000000 +0200
++++ mplayer-svn-src-aros/cpudetect.c	2012-04-15 21:50:50.000000000 +0200
+@@ -25,11 +25,13 @@
+ 
+ #include <stdlib.h>
+ 
+-#ifdef __MORPHOS__
++#if defined(__MORPHOS__) && !defined(__AROS__)
+ #include <proto/exec.h>
+ #include <exec/execbase.h>
+ #include <exec/system.h>
++#endif
+ 
++#if defined(__MORPHOS__)
+ int altivec_disabled = 0;
+ 
+ #endif
+@@ -225,6 +227,9 @@
+     mp_msg(MSGT_CPUDETECT,MSGL_WARN, "Cannot test OS support for SSE, disabling to be safe.\n" );
+     gCpuCaps.hasSSE=0;
+ #endif /* _POSIX_SOURCE */
++#elif defined(__AROS__)
++    /* No changes. AROS kernel support SSE/SSE2 */
++   /* gCpuCaps.hasSSE=0; */
+ #else
+     /* Do nothing on other platforms for now.
+      */
+diff -ur -x.svn mplayer-svn-src/ffmpeg/libavcodec/utils.c mplayer-svn-src-aros/ffmpeg/libavcodec/utils.c
+--- mplayer-svn-src/ffmpeg/libavcodec/utils.c	2012-03-17 01:45:47.000000000 +0100
++++ mplayer-svn-src-aros/ffmpeg/libavcodec/utils.c	2012-04-17 19:36:10.000000000 +0200
+@@ -48,6 +48,10 @@
+ #include <limits.h>
+ #include <float.h>
+ 
++#ifdef __AROS__
++#define SIZE_MAX INT32_MAX
++#endif
++
+ static int volatile entangled_thread_counter=0;
+ static int (*ff_lockmgr_cb)(void **mutex, enum AVLockOp op);
+ static void *codec_mutex;
+diff -ur -x.svn mplayer-svn-src/ffmpeg/libavformat/os_support.c mplayer-svn-src-aros/ffmpeg/libavformat/os_support.c
+--- mplayer-svn-src/ffmpeg/libavformat/os_support.c	2012-01-26 23:15:59.000000000 +0100
++++ mplayer-svn-src-aros/ffmpeg/libavformat/os_support.c	2012-04-17 19:34:44.000000000 +0200
+@@ -69,6 +69,11 @@
+ 
+ #include "network.h"
+ 
++#ifndef INADDR_LOOPBACK
++#define INADDR_LOOPBACK 0x7f000001
++#endif
++
++
+ #if !HAVE_INET_ATON
+ #include <stdlib.h>
+ 
+diff -ur -x.svn mplayer-svn-src/ffmpeg/libavformat/os_support.h mplayer-svn-src-aros/ffmpeg/libavformat/os_support.h
+--- mplayer-svn-src/ffmpeg/libavformat/os_support.h	2012-01-26 23:15:59.000000000 +0100
++++ mplayer-svn-src-aros/ffmpeg/libavformat/os_support.h	2012-04-17 19:40:55.000000000 +0200
+@@ -60,6 +60,13 @@
+ #define closesocket close
+ #endif
+ 
++#if defined(__AROS__)
++#undef closesocket
++#define closesocket CloseSocket
++#include <proto/socket.h>
++#define atoll(x) atol(x)
++#endif
++
+ #if !HAVE_POLL_H
+ typedef unsigned long nfds_t;
+ 
+diff -ur -x.svn mplayer-svn-src/ffmpeg/libavformat/rtsp.h mplayer-svn-src-aros/ffmpeg/libavformat/rtsp.h
+--- mplayer-svn-src/ffmpeg/libavformat/rtsp.h	2012-01-26 23:15:59.000000000 +0100
++++ mplayer-svn-src-aros/ffmpeg/libavformat/rtsp.h	2012-04-17 19:38:26.000000000 +0200
+@@ -31,6 +31,14 @@
+ #include "libavutil/log.h"
+ #include "libavutil/opt.h"
+ 
++#ifndef INET_ADDRSTRLEN
++#define INET_ADDRSTRLEN (16)
++#endif
++
++#ifndef INET6_ADDRSTRLEN
++#define INET6_ADDRSTRLEN (48)
++#endif
++
+ /**
+  * Network layer over which RTP/etc packet data will be transported.
+  */
+diff -ur -x.svn mplayer-svn-src/ffmpeg/libavutil/file.c mplayer-svn-src-aros/ffmpeg/libavutil/file.c
+--- mplayer-svn-src/ffmpeg/libavutil/file.c	2012-01-26 23:15:59.000000000 +0100
++++ mplayer-svn-src-aros/ffmpeg/libavutil/file.c	2012-04-17 19:39:18.000000000 +0200
+@@ -21,6 +21,9 @@
+ #include <fcntl.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
++#ifdef __AROS__
++#define SIZE_MAX INT32_MAX
++#endif
+ #if HAVE_MMAP
+ #include <sys/mman.h>
+ #elif HAVE_MAPVIEWOFFILE
+diff -ur -x.svn mplayer-svn-src/fmt-conversion.c mplayer-svn-src-aros/fmt-conversion.c
+--- mplayer-svn-src/fmt-conversion.c	2012-04-15 21:43:24.000000000 +0200
++++ mplayer-svn-src-aros/fmt-conversion.c	2012-04-16 22:13:47.000000000 +0200
+@@ -65,7 +65,7 @@
+     {IMGFMT_RGBA,    PIX_FMT_RGB0},
+     {IMGFMT_RGB64LE, PIX_FMT_RGBA64LE},
+     {IMGFMT_RGB64BE, PIX_FMT_RGBA64BE},
+-    {IMGFMT_444A,    PIX_FMT_YUVA444P},
++//    {IMGFMT_444A,    PIX_FMT_YUVA444P},
+ #endif
+ #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(51, 20, 1)
+     {IMGFMT_GBR24P,  PIX_FMT_GBRP},
+diff -ur -x.svn mplayer-svn-src/gui/morphos/cfg.c mplayer-svn-src-aros/gui/morphos/cfg.c
+--- mplayer-svn-src/gui/morphos/cfg.c	2011-09-25 17:53:48.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/cfg.c	2012-04-16 21:32:10.000000000 +0200
+@@ -168,7 +168,7 @@
+     return m_config_parse_config_file(gui_conf, filename);
+ }
+ 
+-int cfg_read(void)
++void cfg_read(void)
+ {
+     char *cfg = get_path("gui.conf");
+ 
+@@ -179,10 +179,9 @@
+     if (m_config_parse_config_file(gui_conf, cfg) < 0)
+         mp_msg(MSGT_GPLAYER, MSGL_FATAL, MSGTR_ConfigFileError);
+     free(cfg);
+-    return 0;
+ }
+ 
+-int cfg_write(void)
++void cfg_write(void)
+ {
+     char *cfg = get_path("gui.conf");
+     FILE *f;
+@@ -207,5 +206,4 @@
+         fclose(f);
+     }
+     free(cfg);
+-    return 0;
+ }
+diff -ur -x.svn mplayer-svn-src/gui/morphos/classes.h mplayer-svn-src-aros/gui/morphos/classes.h
+--- mplayer-svn-src/gui/morphos/classes.h	2010-12-08 22:40:11.000000000 +0100
++++ mplayer-svn-src-aros/gui/morphos/classes.h	2012-04-14 15:49:59.000000000 +0200
+@@ -13,6 +13,9 @@
+ #include <proto/intuition.h>
+ 
+ #include <libraries/gadtools.h>
++#if defined(__AROS__)
++#define MUI_OBSOLETE
++#endif
+ #include <libraries/mui.h>
+ #include <proto/muimaster.h>
+ 
+diff -ur -x.svn mplayer-svn-src/gui/morphos/gui.c mplayer-svn-src-aros/gui/morphos/gui.c
+--- mplayer-svn-src/gui/morphos/gui.c	2011-09-26 03:44:12.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/gui.c	2012-04-19 20:59:13.000000000 +0200
+@@ -34,7 +34,9 @@
+ 
+ extern int fullscreen;
+ 
++#if !defined(__AROS__)
+ struct Library * MUIMasterBase = NULL;
++#endif
+ 
+ guiInterface_t guiInfo;
+ 
+@@ -49,10 +51,10 @@
+ 
+ CONST TEXT credits[] =
+ 	"\033bCredits:\033n\n"
+-	"\t© by MPlayer Team\n\n"
++	"\t(C) by MPlayer Team\n\n"
+ 	"\033bMorphOS Port:\033n\n"
+-	"\t© 2003-2004 by Nicolas Det\n"
+-	"\t© 2005-2011 by Fabien Coeurjoly\n\n"
++	"\t(C) 2003-2004 by Nicolas Det\n"
++	"\t(C) 2005-2011 by Fabien Coeurjoly\n\n"
+ 	"\033bReferences:\033n\n"
+ 	"\thttp://mplayerhq.hu\n"
+ 	"\thttp://fabportnawak.free.fr/mplayer/";
+@@ -502,12 +504,14 @@
+ 
+ 	snprintf(iconpath, sizeof(iconpath), "%s.info", _ProgramName);
+ 
++#if !defined(__AROS__)
+ 	if (!(MUIMasterBase = OpenLibrary((UBYTE *)MUIMASTER_NAME, MUIMASTER_VMIN)))
+ 	{
+ 		fprintf(stderr, "Failed to open "MUIMASTER_NAME".");
+ 		res = 1;
+ 		goto quit;
+ 	}
++#endif
+ 
+ 	mygui = malloc(sizeof(*mygui));
+ 
+@@ -532,7 +536,7 @@
+ 	app = NewObject(getmplayerappclass(), NULL,
+ 			MUIA_Application_Title      , "MPlayer",
+ 			MUIA_Application_Version    , muiversion,
+-			MUIA_Application_Copyright  , "©2005-2011 Fabien Coeurjoly",
++			MUIA_Application_Copyright  , "(C)2005-2011 Fabien Coeurjoly",
+ 			MUIA_Application_Author     , "Fabien Coeurjoly",
+ 			MUIA_Application_Description, APPLICATION_DESCRIPTION,
+ 			MUIA_Application_Base       , APPLICATION_BASE,
+@@ -636,7 +640,11 @@
+ 		goto quit;
+ 	}
+ 
+-	if(remember_path)
++#if defined(__AROS__)
++    set(GR_URLGroup, MA_URLGroup_Target, GR_MPlayerGroup);
++#endif
++
++    if(remember_path)
+ 		MorphOS_RestorePath();
+ 
+ 	/* Dynamically added aboutbox (falls back to mui_request if not available) */
+@@ -870,11 +878,13 @@
+ 
+ 	classes_cleanup();
+ 
++#if !defined(__AROS__)
+ 	if (MUIMasterBase)
+ 	{
+ 		CloseLibrary(MUIMasterBase);
+ 		MUIMasterBase = NULL;
+ 	}
++#endif
+ 
+ 	D(kprintf("[GUI] bye bye\n"));
+ 
+diff -ur -x.svn mplayer-svn-src/gui/morphos/gui.h mplayer-svn-src-aros/gui/morphos/gui.h
+--- mplayer-svn-src/gui/morphos/gui.h	2011-09-25 17:45:43.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/gui.h	2012-04-17 19:49:31.000000000 +0200
+@@ -21,6 +21,28 @@
+ #define PATTERN_PLAYLIST "#?.(pls|m3u|m3u8)"
+ #define PATTERN_SUBTITLE "#?.(srt|ssa|ass|sub|txt|vob|utf|utf8|utf-8|smi|rt|aqt|jss|js)"
+ 
++#if defined(__AROS__)
++IPTR DoSuperNew(struct IClass *cl, Object *obj, ULONG tag1, ...);
++APTR AllocVecTaskPooled(ULONG byteSize);
++VOID FreeVecTaskPooled(APTR memory);
++#undef NewObject
++#include <proto/intuition.h>
++#define MUIM_Menustrip_Popup                        (MUIB_MUI|0x00420e76) /* MUI: V20 */
++#define MUIM_Menustrip_ExitChange                   (MUIB_MUI|0x0042ce4d) /* MUI: V20 */
++#define MUIM_Menustrip_InitChange                   (MUIB_MUI|0x0042dcd9) /* MUI: V20 */
++#define MUIA_List_DoubleClick                       (MUIB_MUI|0x00424635) /* MUI: V4  i.g BOOL       */
++#define MUIA_List_DragType                          (MUIB_MUI|0x00425cd3) /* MUI: V11 isg LONG       */
++#define MUIA_List_TitleClick                        (MUIB_MUI|0x00422fd9) /* MUI: V20 ..g LONG       */
++#define MUIV_PushMethod_Delay(millis)               MIN(0x0ffffff0, (((ULONG)millis) << 8))
++#define NM_WHEEL_UP                                 0x7a
++#define NM_WHEEL_DOWN                               0x7b
++#define MUIV_Frame_Window                           MUIV_Frame_None
++#define MUIV_Frame_Page                             MUIV_Frame_None
++#define MCC_TI_TAGBASE                              ((TAG_USER)|((1307<<16)+0x712))
++#define MCC_TI_ID(x)                                (MCC_TI_TAGBASE+(x))
++#define MUIA_Textinput_ResetMarkOnCursor            MCC_TI_ID(157)        /* V29 isg BOOL */
++#endif
++
+ /* gtk emulation */
+ #define GTK_MB_FATAL         0x1
+ #define GTK_MB_ERROR         0x2
+@@ -149,7 +171,6 @@
+ };
+ 
+ /* mplayer vars */
+-extern char *skinName;
+ extern float sub_aspect;
+ extern play_tree_t* playtree;
+ extern m_config_t* mconfig;
+@@ -259,7 +280,6 @@
+ void uiState(void);
+ 
+ /* external vars */
+-extern char * dvd_device;
+ extern int fullscreen;
+ 
+ #endif
+diff -ur -x.svn mplayer-svn-src/gui/morphos/include/macros/vapor.h mplayer-svn-src-aros/gui/morphos/include/macros/vapor.h
+--- mplayer-svn-src/gui/morphos/include/macros/vapor.h	2010-12-08 22:58:19.000000000 +0100
++++ mplayer-svn-src-aros/gui/morphos/include/macros/vapor.h	2012-04-14 16:01:06.000000000 +0200
+@@ -34,6 +34,10 @@
+  * Use DISPATCHERREF to give the dispatcher to the MUI_CreateCustomClass() call, eg:
+  * mcc = MUI_CreateCustomClass(NULL, MUIC_Area, NULL, sizeof(struct Data), DISPATCHERREF);
+  */
++#ifdef __AROS__
++#define DISPATCHERREF dispatch
++#define DISPATCHERREF2(name) name##_dispatch
++#else
+ #ifdef __MORPHOS__
+ #define DISPATCHERREF &GATE_dispatch
+ #define DISPATCHERREF2(name) &GATE_##name##_dispatch
+@@ -41,11 +45,16 @@
+ #define DISPATCHERREF dispatch
+ #define DISPATCHERREF2(name) name##_dispatch
+ #endif /* !__MORPHOS__ */
++#endif
+ 
+ /*
+  * Use BEGINMTABLE to start the description of a dispatcher (BEGINMTABLE2 if you need a name)
+  */
+ #ifdef __GNUC__
++#ifdef __AROS__
++#define BEGINMTABLE BOOPSI_DISPATCHER(IPTR, dispatch, cl, obj, msg){switch(msg->MethodID){
++#define BEGINMTABLE2(name) BOOPSI_DISPATCHER(IPTR, name##_dispatch, cl, obj, msg){switch(msg->MethodID){
++#else
+ #ifdef __MORPHOS__
+ #define BEGINMTABLE static ULONG dispatch(void); \
+ 	static struct EmulLibEntry GATE_dispatch = \
+@@ -79,6 +88,7 @@
+ #define BEGINMTABLE static ULONG dispatch( __reg(a0, struct IClass *cl), __reg(a2, Object *obj), __reg(a1, Msg msg)){switch(msg->MethodID){
+ #define BEGINMTABLE2(name) static ULONG name##_Dispatcher( __reg(a0, struct IClass *cl), __reg(a2, Object *obj), __reg(a1, Msg msg)){switch(msg->MethodID){
+ #endif /* !__MORPHOS__ */
++#endif
+ #else
+ #define BEGINMTABLE static ULONG __asm __saveds dispatch( register __a0 struct IClass *cl, register __a2  Object *obj, register __a1 Msg msg ){switch(msg->MethodID){
+ #define BEGINMTABLE2(name) static ULONG __asm __saveds name##_Dispatcher(register __a0 struct IClass *cl, register __a2 Object *obj, register __a1 Msg msg){switch(msg->MethodID){
+@@ -103,7 +113,11 @@
+ /*
+  * Use ENDMTABLE to end the description of a dispatcher
+  */
++#ifndef __AROS__
+ #define ENDMTABLE }return(DOSUPER);}
++#else
++#define ENDMTABLE }return(DOSUPER);}BOOPSI_DISPATCHER_END
++#endif
+ 
+ 
+ /* Methods */
+@@ -267,6 +281,14 @@
+ 
+ /* Hooks */
+ 
++#ifdef __AROS__
++
++#define MUI_HOOK(n, y, z) \
++    static LONG n##_func(struct Hook * n, y, z); \
++    static struct Hook n##_hook = {{0, 0}, (IPTR (*)())n##_func, NULL, NULL}; \
++    static LONG n##_func(struct Hook * n, y, z)
++
++#else
+ #ifdef __MORPHOS__
+ #define __callback
+ 
+@@ -284,8 +306,8 @@
+ 	struct EmulLibEntry n = { \
+ 	TRAP_LIB, 0, (void (*)(void))n##_GATE }; \
+ 	static LONG n##_GATE(void) { \
+-	return (n##_GATE2((struct Hook *)REG_A0, (void *)REG_A2, (void *)REG_A1)); } \
+-	static struct Hook n##_hook = { { 0, 0}, (ULONG (*)(void))&n, (ULONG (*)(void))&n##_GATE2 , NULL }; \
++    return (n##_GATE2((struct Hook *)REG_A0, (void *)REG_A2, (void *)REG_A1)); } \
++    static struct Hook n##_hook = { { 0, 0}, (ULONG (*)(void))&n, (ULONG (*)(void))&n##_GATE2 , NULL }; \
+ 	static LONG n##_GATE2(struct Hook *h, y, z)
+ #else
+ #define DEFHOOK(n) static struct Hook n##_hook={0,0,(HOOKFUNC)n##_func}
+@@ -297,6 +319,7 @@
+ 
+ #define __callback __asm __saveds
+ #endif /* !_MORPHOS__ */
++#endif /* !__AROS__ */
+ #define _reg(x) register __##x
+ 
+ 
+diff -ur -x.svn mplayer-svn-src/gui/morphos/interface.c mplayer-svn-src-aros/gui/morphos/interface.c
+--- mplayer-svn-src/gui/morphos/interface.c	2011-09-27 03:52:50.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/interface.c	2012-04-21 14:19:57.000000000 +0200
+@@ -60,13 +60,14 @@
+ #include "stream/stream_dvdnav.h"
+ #endif
+ #include "libass/ass.h"
++#include "osdep/timer.h"
+ 
+ #include "morphos_stuff.h"
+ #include "gui/interface.h"
+ #include "gui.h"
+ #include "thread.h"
+ 
+-#define D(x) x;
++#define D(x) ;
+ 
+ extern void dvd_read_name(char *name, char *serial, const char *device);
+ 
+@@ -418,7 +419,7 @@
+ 			 mp_input_queue_cmd(mp_input_parse_cmd(command));
+ 	         break;
+ 		}
+-	    case evSetDVDChapter:
++	    case ivSetDVDChapter:
+ 		{
+ 			 char command[64];
+ 			 snprintf(command, sizeof(command), "seek_chapter %d 1", iparam);
+@@ -426,7 +427,7 @@
+ 			 mp_input_queue_cmd(mp_input_parse_cmd(command));	          
+ 	         break;
+ 		}
+-		case evSetDVDTitle:
++		case ivSetDVDTitle:
+ 		{
+ 			 guiInfo.Track = iparam;
+ 			 goto playdvd;
+@@ -462,7 +463,7 @@
+ 			gui(GUI_PREPARE, 0);
+ 
+ 			mygui->playlist->clear_playlist(mygui->playlist);
+-			mygui->playlist->add_track(mygui->playlist, filename, NULL, dvdname, 0, gui_use_dvdnav ? STREAMTYPE_DVDNAV: STREAMTYPE_DVD);
++			mygui->playlist->add_track(mygui->playlist, gui_use_dvdnav ? "dvdnav://" : "dvd://", NULL, dvdname, 0, gui_use_dvdnav ? STREAMTYPE_DVDNAV: STREAMTYPE_DVD);
+ 
+ 			// Rebuild playlist
+ 			update_playlistwindow(TRUE);
+@@ -625,7 +626,7 @@
+ 		case STREAMTYPE_DVDNAV:
+ 			if(guiInfo.Chapter == guiInfo.Chapters)
+ 				return;
+-			mygui->playercontrol(evSetDVDChapter, (guiInfo.Chapter - 1) + 1);
++			mygui->playercontrol(ivSetDVDChapter, (guiInfo.Chapter - 1) + 1);
+             break;
+ #endif
+ 
+@@ -660,7 +661,7 @@
+ 		case STREAMTYPE_DVDNAV:
+ 			if(guiInfo.Chapter == 1)
+                 return;
+-			mygui->playercontrol(evSetDVDChapter, (guiInfo.Chapter - 1) -1);
++			mygui->playercontrol(ivSetDVDChapter, (guiInfo.Chapter - 1) -1);
+ 
+             break;
+ #endif
+@@ -802,6 +803,7 @@
+ 
+ int stream_interrupt_cb(int timeout)
+ {
++    usec_sleep(timeout * 1000);
+ 	return mygui->running == FALSE; 
+ }
+ 
+@@ -863,9 +865,13 @@
+ 	/* always add screenshot filter */
+ 	m_config_set_option(mconfig, "vf-add", "screenshot");
+ 
++#if !defined(__AROS__)
+ 	if (NewGetTaskAttrs(NULL, &msg, sizeof(struct startupmsg *),
+ 					  TASKINFOTYPE_STARTUPMSG,
+ 					  TAG_DONE) && msg)
++#else
++    msg = ((struct Process *)FindTask(NULL))->pr_Task.tc_UserData;
++#endif
+ 	{
+ 		mygui = NULL;
+ 		gui_initialized = FALSE;
+@@ -878,6 +884,9 @@
+ 
+ 	gui_failed = rc;
+ 
++#if defined(__AROS__)
++    ReplyMsg((struct Message *)msg);
++#endif
+     return 0;
+ }
+ 
+@@ -1040,6 +1049,7 @@
+ 
+             break;
+         }
++#if 0 /* Merge of 34866, partially moved to GUI_PREPARE */
+ 	    case GUI_SET_FILE:
+ 		{
+ 			D(kprintf("GUI_SET_FILE\n"));
+@@ -1082,6 +1092,7 @@
+ 
+ 	        break;
+ 		}
++#endif
+ 	    case GUI_HANDLE_EVENTS:
+ 		{
+ 			//D(kprintf("GUI_HANDLE_EVENTS\n"));
+@@ -1164,7 +1175,24 @@
+ 		case GUI_PREPARE:
+         {
+ 			D(kprintf("GUI_PREPARE %d\n", guiInfo.StreamType));
+-			//gui(GUI_SET_FILE, 0);
++            if (guiInfo.NewPlay == GUI_FILE_NEW)
++            {
++                dvd_title = 0;
++                //audio_id  = -1;
++                if(audio_id != -2) audio_id = -1; // Fixes -nosound
++                video_id  = -1;
++                dvdsub_id = -1;
++                vobsub_id = -1;
++
++                stream_cache_size = -1;
++                autosync  = 0;
++                force_fps = 0;
++
++                free(mygui->icy_info);
++                mygui->icy_info = NULL;
++            }
++
++            guiInfo.sh_video = NULL; // NEW
+ 
+ 			switch(guiInfo.StreamType)
+             {
+@@ -1207,6 +1235,10 @@
+                 }
+ #endif
+             }
++
++			if(!mygui->playlist->tracks) return 0;
++			guiSetFilename(guiInfo.Filename, mygui->playlist->tracks[mygui->playlist->current]->filename);
++
+ 			if(guiInfo.Filename)
+ 				filename = guiInfo.Filename;
+ 			else if(filename && guiInfo.Filename)
+@@ -1226,6 +1258,7 @@
+ 	        ass_top_margin    = gtkASS.top_margin;
+ 	        ass_bottom_margin = gtkASS.bottom_margin;
+ #endif
++	        break;
+         }
+ 
+ 		case GUI_SET_STREAM:
+@@ -1389,7 +1422,7 @@
+ 				guiInfo.VideoWidth = guiInfo.sh_video->disp_w;
+ 				guiInfo.VideoHeight = guiInfo.sh_video->disp_h;
+ 
+-				D(kprintf("Codec %s, FPS %f, Width %d, Height %d\n", codecname, guiInfo.FPS, guiInfo.VideoWidth, guiInfo.VideoHeight));
++				D(kprintf("Codec %s, FPS %d, Width %d, Height %d\n", codecname, (int)guiInfo.FPS, guiInfo.VideoWidth, guiInfo.VideoHeight));
+ 
+ 				sub_aspect = (float)guiInfo.VideoWidth / guiInfo.VideoHeight;
+ 
+@@ -1517,12 +1550,14 @@
+ 			}
+ 			else
+ 			{
++#if !defined(__AROS__) /* AROS: Don't put MPlayer window on screen which has video */
+ 				mygui->gui_ready = FALSE;
+ 				DoMethod(app, MUIM_Application_PushMethod, mygui->maingroup, 2, MM_MPlayerGroup_SetWindow, (APTR) data);
+ 				while(mygui->running && !mygui->gui_ready) // wait until SetWindow is finished or gui is quitting
+ 				{
+ 					Delay(1);
+ 				}
++#endif
+ 			}
+ 			break;
+ 		}
+diff -ur -x.svn mplayer-svn-src/gui/morphos/mplayergroupclass.c mplayer-svn-src-aros/gui/morphos/mplayergroupclass.c
+--- mplayer-svn-src/gui/morphos/mplayergroupclass.c	2011-09-27 01:18:41.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/mplayergroupclass.c	2012-04-19 21:02:22.000000000 +0200
+@@ -30,6 +30,7 @@
+ #endif
+ #include "sub/sub.h"
+ #include "sub/subreader.h"
++#include "sub/vobsub.h"
+ 
+ #include "gui/interface.h"
+ #include "gui.h"
+@@ -49,11 +50,20 @@
+ 
+ static ULONG innerleft, innerright, innertop, innerbottom;
+ 
++#if !defined(__AROS__)
+ /* Handle appwindow messages */
+ static LONG AppMsgFunc(void)
+ {
+ 	struct AppMessage **x = (struct AppMessage **) REG_A1;
+ //	  APTR obj = (APTR) REG_A2;
++#else
++AROS_UFH3(static LONG, AppMsgFunc,
++    AROS_UFPA(struct Hook *         , hook  , A0),
++    AROS_UFPA(APTR                  , obj   , A2),
++    AROS_UFPA(struct AppMessage **  , x     , A1))
++{
++    AROS_USERFUNC_INIT
++#endif
+ 	struct WBArg *ap;
+ 	struct AppMessage *amsg = *x;
+ 	int i;
+@@ -110,10 +120,16 @@
+ 	DoMethod(mygui->playlistgroup, MM_PlaylistGroup_Refresh, TRUE);
+ 
+ 	return(0);
++#if !defined(__AROS__)
+ }
+ 
+ static struct EmulLibEntry AppMsgHookGate = { TRAP_LIB, 0, (void (*)(void))AppMsgFunc };
+ static struct Hook AppMsgHook = { {0, 0}, (HOOKFUNC)&AppMsgHookGate, NULL, NULL };
++#else
++    AROS_USERFUNC_EXIT
++}
++static struct Hook AppMsgHook = { {0, 0}, (HOOKFUNC)&AppMsgFunc, NULL, NULL };
++#endif
+ 
+ /******************************************************************
+  * mplayergroupclass
+@@ -1051,6 +1067,8 @@
+ }
+ 
+ extern int sub_source(MPContext * mpctx);
++extern int dvd_lang_from_sid(stream_t *stream, int id);
++extern int mp_dvdnav_lang_from_sid(stream_t *stream, int sid);
+ 
+ static char * GetSubtitleLabel(int pos, char * buffer, int size)
+ {
+@@ -1069,9 +1087,13 @@
+ 		}
+ 		else if(vo_spudec && guiInfo.mpcontext->stream->type == STREAMTYPE_DVDNAV && pos >= 0)
+ 		{
+-			unsigned char lang[3];
+-			if (mp_dvdnav_lang_from_sid(guiInfo.mpcontext->stream, pos, lang))
++		    int code;
++			if ((code = mp_dvdnav_lang_from_sid(guiInfo.mpcontext->stream, pos)))
+ 			{
++			    char lang[3];
++	            lang[0] = code >> 8;
++	            lang[1] = code;
++	            lang[2] = 0;
+ 				snprintf(buffer, size, "(%d) %s", pos, lang);
+ 			}
+ 			else
+@@ -2237,7 +2259,7 @@
+ 				if(entry)
+ 				{
+ 					set(data->ST_Chapters, MUIA_Text_Contents, entry->label);
+-					mygui->playercontrol(evSetDVDChapter, getv(data->LI_Chapters, MUIA_List_Active));
++					mygui->playercontrol(ivSetDVDChapter, getv(data->LI_Chapters, MUIA_List_Active));
+ 				}
+ 			}
+ 			break;
+@@ -2322,7 +2344,7 @@
+ 		if(entry)
+ 		{
+ 			set(data->ST_Titles, MUIA_Text_Contents, entry->label);;
+-			mygui->playercontrol(evSetDVDTitle, getv(data->LI_Titles, MUIA_List_Active) + 1);
++			mygui->playercontrol(ivSetDVDTitle, getv(data->LI_Titles, MUIA_List_Active) + 1);
+ 		}
+ 	}
+ 
+diff -ur -x.svn mplayer-svn-src/gui/morphos/mui.h mplayer-svn-src-aros/gui/morphos/mui.h
+--- mplayer-svn-src/gui/morphos/mui.h	2010-11-28 18:38:22.000000000 +0100
++++ mplayer-svn-src-aros/gui/morphos/mui.h	2012-04-14 15:21:23.000000000 +0200
+@@ -4,7 +4,9 @@
+ ULONG mui_getv(APTR o, ULONG a);
+ 
+ #define getv(_o,_a) mui_getv(_o,_a)
++#ifndef nnset
+ #define nnset(obj,attr,value) SetAttrs(obj,MUIA_NoNotify,TRUE,attr,value,TAG_DONE)
++#endif
+ 
+ #define _between(_a,_x,_b) ((_x)>=(_a) && (_x)<=(_b))
+ #define _isinobject(_o,_x,_y) (_between(_left(_o),(_x),_right(_o)) && _between(_top(_o),(_y),_bottom(_o)))
+diff -ur -x.svn mplayer-svn-src/gui/morphos/playlist.c mplayer-svn-src-aros/gui/morphos/playlist.c
+--- mplayer-svn-src/gui/morphos/playlist.c	2011-09-25 06:09:35.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/playlist.c	2012-04-21 11:56:05.000000000 +0200
+@@ -36,6 +36,7 @@
+ #include "mp_msg.h"
+ #include "playlist.h"
+ #include "morphos_stuff.h"
++#include <clib/debug_protos.h>
+ 
+ /* TODO: implement sort_playlist */
+ 
+@@ -60,7 +61,12 @@
+ 
+ 			if(stat(filename, &st) != -1)
+ 			{
++#if !defined(__AROS__)
+ 				if(S_ISDIR(st.st_mode))
++#else
++                if((S_ISDIR(st.st_mode)) && (strcmp(entry->d_name, ".") != 0)
++                        && (strcmp(entry->d_name, "..") != 0))
++#endif
+ 				{
+ 					if(recursive)
+ 					{
+diff -ur -x.svn mplayer-svn-src/gui/morphos/playlistgroupclass.c mplayer-svn-src-aros/gui/morphos/playlistgroupclass.c
+--- mplayer-svn-src/gui/morphos/playlistgroupclass.c	2011-09-25 06:12:10.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/playlistgroupclass.c	2012-04-19 21:02:34.000000000 +0200
+@@ -8,10 +8,19 @@
+ #include "gui/interface.h"
+ #include "gui.h"
+ 
++#if !defined(__AROS__)
+ static LONG AppMsgFunc(void)
+ {
+ 	struct AppMessage **x = (struct AppMessage **) REG_A1;
+ 	APTR obj = (APTR) REG_A2;
++#else
++AROS_UFH3(static LONG, AppMsgFunc,
++    AROS_UFPA(struct Hook *         , hook  , A0),
++    AROS_UFPA(APTR                  , obj   , A2),
++    AROS_UFPA(struct AppMessage **  , x     , A1))
++{
++    AROS_USERFUNC_INIT
++#endif
+ 	struct WBArg *ap;
+ 	struct AppMessage *amsg = *x;
+ 	int i;
+@@ -52,10 +61,16 @@
+ 	}
+ 
+ 	return(0);
++#if !defined(__AROS__)
+ }
+ 
+ static struct EmulLibEntry AppMsgHookGate = { TRAP_LIB, 0, (void (*)(void))AppMsgFunc };
+ static struct Hook AppMsgHook = { {0, 0}, (HOOKFUNC)&AppMsgHookGate, NULL, NULL };
++#else
++    AROS_USERFUNC_EXIT
++}
++static struct Hook AppMsgHook = { {0, 0}, (HOOKFUNC)&AppMsgFunc, NULL, NULL };
++#endif
+ 
+ /******************************************************************
+  * playlistgroupclass
+@@ -256,6 +271,11 @@
+ 
+ 	MUI_DisposeObject(popmenu);
+ 
++#if defined(__AROS__)
++	/* Since MUIM_Menustrip_Popup does nothing for now, just assume selection for files */
++	action = POPMENU_FILE;
++#endif
++
+ 	if(action == POPMENU_FILE)
+ 	{
+ 		char ** files = NULL;
+diff -ur -x.svn mplayer-svn-src/gui/morphos/prefsgeneralgroupclass.c mplayer-svn-src-aros/gui/morphos/prefsgeneralgroupclass.c
+--- mplayer-svn-src/gui/morphos/prefsgeneralgroupclass.c	2010-11-28 18:53:19.000000000 +0100
++++ mplayer-svn-src-aros/gui/morphos/prefsgeneralgroupclass.c	2012-04-16 21:39:53.000000000 +0200
+@@ -11,8 +11,6 @@
+ extern char cfg_dvd_device[];
+ extern char *stream_dump_name;
+ 
+-void greplace(char ***list, const char *search, const char *replace);
+-
+ /******************************************************************
+  * prefsgeneralgroupclass
+  *****************************************************************/
+@@ -468,8 +466,8 @@
+ 
+ /* general */
+ 	/* output drivers */
+-	gaddlist(&video_driver_list, (STRPTR) getv(data->ST_VideoDrivers, MUIA_Text_Contents));
+-	greplace(&video_driver_list, NULL, "cgx_wpa"); // Always add wpa as fallback
++	listSet(&video_driver_list, (STRPTR) getv(data->ST_VideoDrivers, MUIA_Text_Contents));
++	listRepl(&video_driver_list, NULL, "cgx_wpa"); // Always add wpa as fallback
+ 
+ 	/* update embedded mode */
+ 	mygui->embedded = FALSE;
+@@ -478,7 +476,7 @@
+ 		mygui->embedded = TRUE;
+ 	}
+ 
+-	gaddlist(&audio_driver_list, (STRPTR) getv(data->ST_AudioDrivers, MUIA_Text_Contents));
++	listSet(&audio_driver_list, (STRPTR) getv(data->ST_AudioDrivers, MUIA_Text_Contents));
+ 
+ 	/* devices */
+ 	free(dvd_device);
+diff -ur -x.svn mplayer-svn-src/gui/morphos/spacerclass.c mplayer-svn-src-aros/gui/morphos/spacerclass.c
+--- mplayer-svn-src/gui/morphos/spacerclass.c	2008-10-24 04:57:31.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/spacerclass.c	2012-04-14 19:05:47.000000000 +0200
+@@ -92,8 +92,10 @@
+ 
+ 		ULONG vertoffs   = mleft + (mwidth / 2);
+ 
++#if !defined(__AROS__)
+ 		ProcessPixelArray( rp, vertoffs,     mtop + 1, 1, mheight - 2, POP_BRIGHTEN, 70, NULL);
+ 		ProcessPixelArray( rp, vertoffs - 1, mtop + 1, 1, mheight - 2, POP_DARKEN,   70, NULL);
++#endif
+ 	}
+ 
+ 	return 0;
+diff -ur -x.svn mplayer-svn-src/gui/morphos/thread.c mplayer-svn-src-aros/gui/morphos/thread.c
+--- mplayer-svn-src/gui/morphos/thread.c	2008-11-21 21:43:00.000000000 +0100
++++ mplayer-svn-src-aros/gui/morphos/thread.c	2012-04-14 15:35:16.000000000 +0200
+@@ -38,17 +38,29 @@
+ 				thread->msg->msg.mn_ReplyPort    = thread->replyport;
+ 				thread->msg->msg.mn_Length       = sizeof(struct startupmsg);
+ 
++#if !defined(__AROS__)
+ 				thread->task = CreateNewProcTags(NP_CodeType,    CODETYPE_PPC,
++#else
++                thread->task = CreateNewProcTags(
++#endif
+ 										 NP_Name,		 (ULONG) threadname,
+ 										 NP_Entry,       (ULONG) func,
++#if !defined(__AROS__)
+ 										 NP_StartupMsg,  (ULONG) thread->msg,
+ 										 NP_TaskMsgPort, (ULONG) &port,
++#else
++                                         NP_UserData,  (IPTR) thread->msg,
++#endif
+ 										 NP_CloseOutput, FALSE,
+ 										 NP_Output,      Output(),
+ 										 NP_CloseInput,  FALSE,
+ 										 NP_Input,       Input(),
+ 										 NP_Priority,    (LONG) 1,
++#if !defined(__AROS__)
+ 										 NP_PPCStackSize, 65536,
++#else
++                                         NP_StackSize, 65536,
++#endif
+ 										 TAG_DONE);
+ 			}
+ 		}
+diff -ur -x.svn mplayer-svn-src/gui/morphos/urlgroupclass.c mplayer-svn-src-aros/gui/morphos/urlgroupclass.c
+--- mplayer-svn-src/gui/morphos/urlgroupclass.c	2010-12-08 23:22:15.000000000 +0100
++++ mplayer-svn-src-aros/gui/morphos/urlgroupclass.c	2012-04-19 20:27:01.000000000 +0200
+@@ -92,8 +92,28 @@
+ 	return rc;
+ }
+ 
++#if defined(__AROS__)
++DEFSET(URLGroup)
++{
++    struct URLGroupData *data = INST_DATA(cl, obj);
++
++    FORTAG(INITTAGS)
++    {
++        case MA_URLGroup_Target:
++            data->TargetObj = tag->ti_Data;
++            break;
++    }
++    NEXTTAG
++
++    return DOSUPER;
++}
++#endif
++
+ BEGINMTABLE2(urlgroupclass)
+ DECNEW(URLGroup)
++#if defined(__AROS__)
++DECSET(URLGroup)
++#endif
+ DECMMETHOD(Show)
+ DECTMETHOD(URLGroup_Open)
+ DECTMETHOD(URLGroup_Cancel)
+diff -ur -x.svn mplayer-svn-src/gui/morphos/videoareaclass.c mplayer-svn-src-aros/gui/morphos/videoareaclass.c
+--- mplayer-svn-src/gui/morphos/videoareaclass.c	2011-06-05 22:21:48.000000000 +0200
++++ mplayer-svn-src-aros/gui/morphos/videoareaclass.c	2012-04-14 16:03:23.000000000 +0200
+@@ -5,7 +5,11 @@
+ #include "gui/interface.h"
+ #include "gui.h"
+ 
++#ifndef __AROS__ /* AROS:CHANGED */
+ #define USE_BACKFILL 1
++#else
++#define USE_BACKFILL 0
++#endif
+ 
+ 
+ #if USE_BACKFILL
+diff -ur -x.svn mplayer-svn-src/libao2/ao_ahi_dev.c mplayer-svn-src-aros/libao2/ao_ahi_dev.c
+--- mplayer-svn-src/libao2/ao_ahi_dev.c	2011-06-13 17:16:18.000000000 +0200
++++ mplayer-svn-src-aros/libao2/ao_ahi_dev.c	2012-04-21 11:07:10.000000000 +0200
+@@ -18,7 +18,14 @@
+ #include <dos/dostags.h>
+ #include <dos/dos.h>
+ 
++#ifndef __AROS__
+ #include <hardware/byteswap.h>
++#endif
++
++#ifdef __AROS__
++#define SWAPWORD(w) AROS_SWAP_BYTES_WORD(w)
++#define SWAPLONG(l) AROS_SWAP_BYTES_LONG(l)
++#endif
+ // End OS Specific
+ 
+ #include "../libaf/af_format.h"
+@@ -95,14 +102,18 @@
+ 
+ static ao_info_t info = 
+ {
+-#ifdef __MORPHOS__
++#if defined(__AROS__)
++   "AHI audio output using high-level API (AROS)",
++#elif defined(__MORPHOS__)
+    "AHI audio output using high-level API (MorphOS)",
+ #else
+    "AHI audio output using high-level API (AmigaOS)",
+ #endif
+    "ahi_dev",
+    "DET Nicolas",
+-#ifdef __MORPHOS__
++#if defined(__AROS__)
++   "AROS No schedule 'n' rocking"
++#elif defined(__MORPHOS__)
+    "MorphOS Rulez :-)"
+ #else
+    "Amiga Survivor !",
+@@ -370,15 +381,23 @@
+ 		 AHIType = channels > 1 ? AHIST_S16S : AHIST_M16S;
+ 		 break;
+ 	  case AF_FORMAT_S16_BE:
+-		 convop  = CO_NONE;
++#if AROS_BIG_ENDIAN || !defined(__AROS__)
++         convop  = CO_NONE;
++#else
++         convop  = CO_16_LE2BE;
++#endif
+ 		 AHIType = channels > 1 ? AHIST_S16S : AHIST_M16S;
+ 		 break;
+ 	  case AF_FORMAT_U16_LE:
+-		 convop  = CO_16_LE2BE_U2S;
++		 convop  = CO_16_LE2BE_U2S; /* FIXME: Different conversion needed for i386 AROS */
+ 		 AHIType = channels > 1 ? AHIST_S16S : AHIST_M16S;
+ 		 break;
+ 	  case AF_FORMAT_S16_LE:
+-		 convop  = CO_16_LE2BE;
++#if AROS_BIG_ENDIAN || !defined(__AROS__)
++         convop  = CO_16_LE2BE;
++#else
++         convop  = CO_NONE;
++#endif
+ 		 AHIType = channels > 1 ? AHIST_S16S : AHIST_M16S;
+ 		 break;
+ 	  case AF_FORMAT_S24_BE:
+@@ -390,11 +409,19 @@
+ 		 AHIType = channels > 1 ? AHIST_S32S : AHIST_M32S;
+ 		 break;
+ 	  case AF_FORMAT_S32_BE:
++#if AROS_BIG_ENDIAN || !defined(__AROS__)
+ 		 convop  = CO_NONE;
++#else
++		 convop  = CO_32_LE2BE;
++#endif
+ 		 AHIType = channels > 1 ? AHIST_S32S : AHIST_M32S;
+ 		 break;
+ 	  case AF_FORMAT_S32_LE:
++#if AROS_BIG_ENDIAN || !defined(__AROS__)
+ 		 convop  = CO_32_LE2BE;
++#else
++		 convop  = CO_NONE;
++#endif
+ 		 AHIType = channels > 1 ? AHIST_S32S : AHIST_M32S;
+ 		 break;
+ 	  case AF_FORMAT_AC3:
+@@ -404,11 +431,19 @@
+ 		 break;
+ 
+ 	  case AF_FORMAT_FLOAT_BE:
++#if AROS_BIG_ENDIAN || !defined(__AROS__)
+ 	 	 convop  = CO_FLOAT_S32BE;
++#else
++	 	 convop  = CO_FLOAT_S32LE;
++#endif
+ 	 	 AHIType = channels > 1 ? AHIST_S32S : AHIST_M32S;
+ 	 	 break;
+ 	  case AF_FORMAT_FLOAT_LE:
++#if AROS_BIG_ENDIAN || !defined(__AROS__)
+ 	 	 convop  = CO_FLOAT_S32LE;
++#else
++	 	 convop  = CO_FLOAT_S32BE;
++#endif
+ 	 	 AHIType = channels > 1 ? AHIST_S32S : AHIST_M32S;
+ 	   	 break;
+ /*
+@@ -457,7 +492,9 @@
+ 
+    kk(KPrintF("Creating Task\n");)
+    if ( ! (PlayerTask_Process = CreateNewProcTags(
++#ifndef __AROS__
+ 				  NP_CodeType,         CODETYPE_PPC,
++#endif
+ 				  NP_Entry,            (ULONG) PlayerTask,
+ 				  NP_Name,             PLAYERTASK_NAME,
+ 				  NP_Priority,         PLAYERTASK_PRIORITY,          
+diff -ur -x.svn mplayer-svn-src/libao2/audio_out.c mplayer-svn-src-aros/libao2/audio_out.c
+--- mplayer-svn-src/libao2/audio_out.c	2012-04-15 21:43:03.000000000 +0200
++++ mplayer-svn-src-aros/libao2/audio_out.c	2012-04-15 21:50:40.000000000 +0200
+@@ -80,7 +80,9 @@
+ #endif
+ 
+ #ifdef __MORPHOS__
++#if !defined(__AROS__)
+    &audio_out_ahi,
++#endif
+    &audio_out_ahi_dev,
+ #endif
+ 
+diff -ur -x.svn mplayer-svn-src/libdvdread4/bswap.h mplayer-svn-src-aros/libdvdread4/bswap.h
+--- mplayer-svn-src/libdvdread4/bswap.h	2009-02-02 16:16:43.000000000 +0100
++++ mplayer-svn-src-aros/libdvdread4/bswap.h	2012-04-14 16:55:08.000000000 +0200
+@@ -73,6 +73,12 @@
+  * functionality!
+  */
+ 
++#elif defined (__AROS__)
++#include <proto/exec.h>
++#define B2N_16(x) x = AROS_BE2WORD(x)
++#define B2N_32(x) x = AROS_BE2LONG(x)
++#define B2N_64(x) x = AROS_BE2QUAD(x)
++
+ #elif defined(__FreeBSD__) || defined(__sun) || defined(__bsdi__) || defined(WIN32) || defined(__CYGWIN__) || defined(__BEOS__) || defined(__OS2__)
+ #define B2N_16(x)                             \
+  x = ((((x) & 0xff00) >> 8) |                 \
+diff -ur -x.svn mplayer-svn-src/libdvdread4/dvd_reader.c mplayer-svn-src-aros/libdvdread4/dvd_reader.c
+--- mplayer-svn-src/libdvdread4/dvd_reader.c	2011-09-22 12:25:48.000000000 +0200
++++ mplayer-svn-src-aros/libdvdread4/dvd_reader.c	2012-04-14 16:53:47.000000000 +0200
+@@ -342,6 +342,7 @@
+ #ifdef __MORPHOS__
+ #include <dos/dos.h>
+ #include <proto/dos.h>
++#include <proto/exec.h>
+ extern void dvdinput_setup_file_access(void);
+ #endif
+ 
+diff -ur -x.svn mplayer-svn-src/libmpcodecs/vf_spp.c mplayer-svn-src-aros/libmpcodecs/vf_spp.c
+--- mplayer-svn-src/libmpcodecs/vf_spp.c	2012-04-15 21:42:25.000000000 +0200
++++ mplayer-svn-src-aros/libmpcodecs/vf_spp.c	2012-04-17 19:42:36.000000000 +0200
+@@ -524,8 +524,8 @@
+         vf->priv->temp= NULL;
+         free(vf->priv->src);
+         vf->priv->src= NULL;
+-        free(vf->priv->avctx);
+-        vf->priv->avctx= NULL;
++//        free(vf->priv->avctx);
++//        vf->priv->avctx= NULL;
+         free(vf->priv->non_b_qp);
+         vf->priv->non_b_qp= NULL;
+ 
+@@ -578,8 +578,8 @@
+ 
+     init_avcodec();
+ 
+-    vf->priv->avctx= avcodec_alloc_context3(NULL);
+-    ff_dsputil_init(&vf->priv->dsp, vf->priv->avctx);
++//    vf->priv->avctx= avcodec_alloc_context3(NULL);
++//    ff_dsputil_init(&vf->priv->dsp, vf->priv->avctx);
+ 
+     vf->priv->log2_count= 3;
+ 
+diff -ur -x.svn mplayer-svn-src/libmpdemux/mp_taglists.c mplayer-svn-src-aros/libmpdemux/mp_taglists.c
+--- mplayer-svn-src/libmpdemux/mp_taglists.c	2012-04-15 21:43:24.000000000 +0200
++++ mplayer-svn-src-aros/libmpdemux/mp_taglists.c	2012-04-16 22:15:03.000000000 +0200
+@@ -125,7 +125,7 @@
+     { CODEC_ID_BMV_VIDEO,         MKTAG('B', 'M', 'V', 'V')},
+     { CODEC_ID_C93,               MKTAG('C', '9', '3', 'V')},
+     { CODEC_ID_CDGRAPHICS,        MKTAG('C', 'D', 'G', 'R')},
+-    { CODEC_ID_CDXL,              MKTAG('C', 'D', 'X', 'L')},
++//    { CODEC_ID_CDXL,              MKTAG('C', 'D', 'X', 'L')},
+     { CODEC_ID_CMV,               MKTAG('M', 'V', 'I', 'f')},
+     { CODEC_ID_DFA,               MKTAG('C', 'D', 'F', 'A')},
+     { CODEC_ID_DNXHD,             MKTAG('A', 'V', 'd', 'n')},
+diff -ur -x.svn mplayer-svn-src/libvo/cgx_common.c mplayer-svn-src-aros/libvo/cgx_common.c
+--- mplayer-svn-src/libvo/cgx_common.c	2011-09-25 06:59:22.000000000 +0200
++++ mplayer-svn-src-aros/libvo/cgx_common.c	2012-04-14 18:01:15.000000000 +0200
+@@ -249,11 +249,14 @@
+ 	}
+ }
+ 
++#if !defined(__AROS__)
+ /***************************/
+ // Our trasparency hook
+ static void MyTranspHook(struct Hook *hook,struct Window *window,struct TransparencyMessage *msg);
++#endif
+ static BOOL ismouseon(struct Window *window);
+ 
++#if !defined(__AROS__)
+ struct Hook transphook = 
+ {
+    {NULL, NULL},
+@@ -261,6 +264,7 @@
+    (APTR) MyTranspHook,
+    NULL
+ };
++#endif
+ 
+ /***************************/
+ 
+@@ -312,6 +316,7 @@
+ 		break;
+ 		case DISAPBORDER:
+ 		{
++#ifndef __AROS__
+ 			struct TagItem tags[] =
+ 			{
+ 				{TRANSPCONTROL_REGIONHOOK, (ULONG) &transphook},
+@@ -319,6 +324,7 @@
+ 			};
+ 
+ 			TransparencyControl(My_Window, TRANSPCONTROLMETHOD_INSTALLREGIONHOOK, tags);
++#endif
+ 		}
+ 	}
+ }
+@@ -360,7 +366,9 @@
+ 
+ 		if(toggleborder)
+ 		{
++#ifndef __AROS__
+ 			TransparencyControl(My_Window,TRANSPCONTROLMETHOD_UPDATETRANSPARENCY,NULL);
++#endif
+ 		}
+ 	}
+ }
+@@ -464,11 +472,15 @@
+ 				case IDCMP_CLOSEWINDOW: mplayer_put_key(KEY_ESC); break;
+ 
+ 				case IDCMP_ACTIVEWINDOW:
++#ifndef __AROS__
+ 					if (Cgx_BorderMode == DISAPBORDER) TransparencyControl(My_Window,TRANSPCONTROLMETHOD_UPDATETRANSPARENCY,NULL);
++#endif
+ 					break;
+ 
+ 				case IDCMP_INACTIVEWINDOW:
++#ifndef __AROS__
+ 					if (Cgx_BorderMode == DISAPBORDER) TransparencyControl(My_Window,TRANSPCONTROLMETHOD_UPDATETRANSPARENCY,NULL);
++#endif
+ 					break;
+ 
+ 				case IDCMP_MOUSEBUTTONS:
+@@ -536,6 +548,7 @@
+ 							}
+ 						}
+ 						
++#ifndef __AROS__
+ 						if (Cgx_BorderMode == DISAPBORDER)
+ 						{
+ 							BOOL mouse = ismouseon(My_Window);
+@@ -543,6 +556,7 @@
+ 							if (mouse != mouseonborder) TransparencyControl(My_Window, TRANSPCONTROLMETHOD_UPDATETRANSPARENCY,NULL);
+ 								mouseonborder = mouse;
+ 						}
++#endif
+ 						sprintf(cmd_str,"set_mouse_pos %i %i", MouseX-My_Window->BorderLeft, MouseY-My_Window->BorderTop);
+ 	                    mp_input_queue_cmd(mp_input_parse_cmd(cmd_str));
+ 					}
+@@ -702,6 +716,7 @@
+ 	return FALSE;
+ }
+ 
++#ifndef __AROS__
+ static void MyTranspHook(struct Hook *hook,struct Window *window,struct TransparencyMessage *msg)
+ {
+ 	struct Rectangle rect;
+@@ -741,6 +756,7 @@
+ 
+ 	OrRectRegion(msg->Region,&rect);
+ }
++#endif
+ 
+ static int blanker_count = 0; /* not too useful, but it should be 0 at the end */
+ 
+@@ -770,7 +786,9 @@
+ 			
+ 			if(screen)
+ 			{
++#ifndef __AROS__
+ 				SetAttrs(screen, SA_StopBlanker, enable ? FALSE : TRUE, TAG_DONE);
++#endif
+ 			}
+ 		}
+ 	}
+diff -ur -x.svn mplayer-svn-src/libvo/cgx_common.h mplayer-svn-src-aros/libvo/cgx_common.h
+--- mplayer-svn-src/libvo/cgx_common.h	2008-12-20 16:34:00.000000000 +0100
++++ mplayer-svn-src-aros/libvo/cgx_common.h	2012-04-15 07:47:01.000000000 +0200
+@@ -12,11 +12,13 @@
+ 
+ #define __OLDMOS__
+ 
++#ifndef __AROS__ /* Remove compiler warnings */
+ // Some Libs
+ extern struct GfxBase *           GfxBase;
+ extern struct Library *           CyberGfxBase;
+ extern struct IntuitionBase *     IntuitionBase;
+ extern struct Library * 		  LayersBase;
++#endif
+ 
+ /****/
+ #define NOBORDER			0
+diff -ur -x.svn mplayer-svn-src/libvo/video_out.c mplayer-svn-src-aros/libvo/video_out.c
+--- mplayer-svn-src/libvo/video_out.c	2012-04-15 21:43:09.000000000 +0200
++++ mplayer-svn-src-aros/libvo/video_out.c	2012-04-15 21:50:42.000000000 +0200
+@@ -158,7 +158,7 @@
+ 
+ const vo_functions_t* const video_out_drivers[] =
+ {
+-#ifdef __MORPHOS__
++#if defined(__MORPHOS__) && !defined(__AROS__)
+ #ifdef CONFIG_GUI
+ 	&video_out_cgx_overlay_gui,
+ #endif
+@@ -166,6 +166,9 @@
+ 	&video_out_cgx_wpa,
+ 	&video_out_cgx_vmem,
+ #endif
++#if defined(__AROS__)
++	&video_out_cgx_wpa,
++#endif
+ #ifdef CONFIG_XVR100
+         &video_out_xvr100,
+ #endif
+diff -ur -x.svn mplayer-svn-src/libvo/vo_cgx_wpa.c mplayer-svn-src-aros/libvo/vo_cgx_wpa.c
+--- mplayer-svn-src/libvo/vo_cgx_wpa.c	2011-09-25 17:57:50.000000000 +0200
++++ mplayer-svn-src-aros/libvo/vo_cgx_wpa.c	2012-04-19 21:22:27.000000000 +0200
+@@ -1,7 +1,7 @@
+ /*
+- *  vo_cgx_vmem.c
++ *  vo_cgx_wpa.c
+  *  VO module for MPlayer MorphOS
+- *  using CGX/direct VMEM
++ *  using CGX WPA
+  *  Writen by DET Nicolas
+ */
+ 
+@@ -11,18 +11,24 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
+-#include "aspect.h"
+ #include "config.h"
+ 
++#include "sub/osd.h"
++#include "sub/sub.h"
++
+ #include "mp_msg.h"
+ #include "video_out.h"
+ #include "video_out_internal.h"
+ #include "cgx_common.h"
+-#include "version.h"
+-#include "sub/osd.h"
+-#include "sub/sub.h"
+ 
+-#include "../morphos_stuff.h"
++#include "../ffmpeg/libswscale/swscale.h"
++#include "../ffmpeg/libswscale/swscale_internal.h" //FIXME
++#include "../ffmpeg/libswscale/rgb2rgb.h"
++#include "../libmpcodecs/vf_scale.h"
++
++#include "aspect.h"
++
++#include "morphos_stuff.h"
+ 
+ #ifdef CONFIG_GUI
+ #include "gui/interface.h"
+@@ -30,12 +36,8 @@
+ #include "mplayer.h"
+ #endif
+ 
+-#include "libswscale/swscale.h"
+-#include "libswscale/swscale_internal.h" //FIXME
+-#include "libswscale/rgb2rgb.h"
+-#include "../libmpcodecs/vf_scale.h"
+-
+ #include <inttypes.h>		// Fix <postproc/rgb2rgb.h> bug
++#include "version.h"
+ 
+ //Debug
+ #define kk(x)
+@@ -59,8 +61,8 @@
+ {
+ 	"CyberGraphX video output (WPA)",
+ 	"cgx_wpa",
+-	"DET Nicolas",
+-	"MorphOS rules da world !"
++	"DET Nicolas, Krzysztof Smiechowicz",
++	"Based on MorphOS version"
+ };
+ 
+ LIBVO_EXTERN(cgx_wpa)
+@@ -74,37 +76,52 @@
+ static struct RastPort *       rp             = NULL;
+ 
+ static struct MsgPort *        UserMsg        = NULL;
+-static UBYTE *                 image_buffer_mem = NULL;
+-static UBYTE *                 image_buffer     = NULL;
+ 
+ extern char PubScreenName[128];
+ 
+-// not OS specific
+-static uint32_t   image_width;            // well no comment
++/* Information about source image (as in width and height of video file) */
++static uint32_t   image_format;
++static uint32_t   image_width;
+ static uint32_t   image_height;
+-static uint32_t   window_width;           // width and height on the window
+-static uint32_t   window_height;          // can be different from the image
+-static uint32_t   screen_width;           // Indicates the size of the screen in full screen
+-static uint32_t   screen_height;          // Only use for triple buffering
++
++/* Information about the shown video (as in width and height of area where video is displayed
++   In window mode, the draw_buffer_width(height) map to Window->InnerWidth(Height)
++   In fullscreen mode, the greater size maps to matching screen size. The other
++   size is calculated to maintain aspect */
++static UBYTE *          draw_buffer_mem = NULL;
++static UBYTE *          draw_buffer = NULL;
++const static uint32_t   draw_buffer_bpp = 4;
++const static uint32_t   draw_buffer_format = IMGFMT_BGRA;
++static uint32_t         draw_buffer_width;
++static uint32_t         draw_buffer_height;
++
++/* Size of the screen on which video is displayed (fullscreen mode ) */
++static uint32_t   screen_width;
++static uint32_t   screen_height;
+ 
+ uint32_t	 is_fullscreen;
+ 
+ extern UWORD *EmptyPointer;               // Blank pointer
+ extern ULONG WantedModeID;
+ 
+-static uint32_t   image_bpp;            	// image bpp
+-static uint32_t   offset_x;               	// offset in the rp where we have to display the image
+-static uint32_t   offset_y;               	// ...
+-static uint32_t   internal_offset_x;        // Indicate where to render the picture inside the bitmap
+-static uint32_t   internal_offset_y;        // ...
++/* Offsets from start of drawable area (RastPort) where video should be rendered
++   In windows mode, they equal BorderLeft and BorderTop
++   In fullscreen mode they equal half difference between screen dimension and
++   draw_buffer_dimension */
++static uint32_t   offset_x;
++static uint32_t   offset_y;
+ 
+-static uint32_t		image_format;
+ 
++/* Position where the window should be created */
+ static uint32_t   win_left;             
+ static uint32_t   win_top;              
++static uint32_t   win_width;
++static uint32_t   win_height;
++static BOOL       win_init;
+ 
+ static SwsContext *swsContext=NULL;
+ 
++#ifndef __AROS__
+ /***************************************/
+ static void BackFill_Func(void);
+ 
+@@ -139,15 +156,14 @@
+ # pragma pack()
+ #endif
+ 
+-
+ static void BackFill_Func(void)
+ {
+-	PREPARE_BACKFILL(window_width, window_height);
++	PREPARE_BACKFILL(draw_buffer_width, draw_buffer_height);
+ 	WritePixelArray(
+-		image_buffer,	
++		draw_buffer,	
+ 		BufferStartX,
+ 		BufferStartY,
+-		window_width*image_bpp,
++		draw_buffer_width*image_bpp,
+ 		&MyRP,
+ 		StartX,
+ 		StartY,
+@@ -155,33 +171,113 @@
+ 		SizeY,
+ 		RECTFMT_RGB);
+ }
++#else
+ 
+-
+-/******************************** DRAW ALPHA ******************************************/
+-// Draw_alpha series !
+-static void draw_alpha_null (int x0,int y0, int w,int h, unsigned char* src, unsigned char *srca, int stride)
++struct layerhookmsg
+ {
+-	// Nothing
++    struct Layer *l;
++    WORD MinX, MinY, MaxX, MaxY;
++    LONG OffsetX, OffsetY;
++};
++
++AROS_UFH3(void, BackFill_Func,
++    AROS_UFHA(struct Hook *, hook, A0),
++    AROS_UFHA(struct RastPort *, rp, A2),
++    AROS_UFHA(APTR, message, A1))
++{
++    AROS_USERFUNC_INIT
++    
++    struct layerhookmsg * args = (struct layerhookmsg *) message; 
++    struct Layer * lay = rp->Layer; 
++    struct Rectangle renderableRect, movieRect, requestedRect, resultRect;
++    struct RastPort * rptemp = CloneRastPort(rp);
++    rptemp->Layer = NULL;
++
++    if (!lay) return;
++
++    requestedRect.MinX = args->MinX;
++    requestedRect.MaxX = args->MaxX;
++    requestedRect.MinY = args->MinY;
++    requestedRect.MaxY = args->MaxY;
++
++    /* 1. Handle the damaged region on the window */
++    renderableRect.MinX = lay->bounds.MinX + My_Window->BorderLeft;
++    renderableRect.MaxX = lay->bounds.MaxX - My_Window->BorderRight;
++    renderableRect.MinY = lay->bounds.MinY + My_Window->BorderTop;
++    renderableRect.MaxY = lay->bounds.MaxY - My_Window->BorderBottom;
++    
++    if (AndRectRect(&renderableRect, &requestedRect, &resultRect))
++    {
++        if (is_fullscreen)
++        {
++            /* In full screen repaint in black */
++        	FillPixelArray(rptemp, 
++        	    resultRect.MinX, resultRect.MinY, 
++        	    resultRect.MaxX - resultRect.MinX + 1, 
++        	    resultRect.MaxY - resultRect.MinY + 1, 0x00000000);
++        }
++    }
++    
++    /* 2. Handle the damaged region in area where movie plays */
++    movieRect.MinX = lay->bounds.MinX + offset_x;
++    movieRect.MaxX = lay->bounds.MinX + offset_x + draw_buffer_width - 1;
++    movieRect.MinY = lay->bounds.MinY + offset_y;
++    movieRect.MaxY = lay->bounds.MinY + offset_y + draw_buffer_height - 1;
++    
++    if (AndRectRect(&movieRect, &requestedRect, &resultRect))
++    {
++        ULONG BufferStartX  = resultRect.MinX - offset_x - lay->bounds.MinX;
++        ULONG BufferStartY 	= resultRect.MinY - offset_y - lay->bounds.MinY;
++
++        WritePixelArray(
++            draw_buffer,	
++            BufferStartX,
++            BufferStartY,
++            draw_buffer_width * draw_buffer_bpp,
++            rptemp,
++            resultRect.MinX,
++            resultRect.MinY,
++            resultRect.MaxX - resultRect.MinX + 1,
++            resultRect.MaxY - resultRect.MinY + 1,
++            RECTFMT_BGRA32);
++    }
++
++    if (rptemp)
++        FreeRastPort(rptemp);
++    
++    AROS_USERFUNC_EXIT
+ }
+ 
+-static void draw_alpha_rgb24 (int x0,int y0, int w,int h, unsigned char* src, unsigned char * srca, int stride)
++struct Hook BackFill_Hook = 
++{
++h_Entry: (IPTR (*)())BackFill_Func,
++h_Data: NULL,
++};
++#endif
++
++
++/******************************** DRAW ALPHA ******************************************/
++static void draw_alpha_rgb32 (int x0,int y0, int w,int h, unsigned char* src, unsigned char * srca, int stride)
+ {
+-	vo_draw_alpha_rgb24(w,h,src,srca,
+-				stride,
+-				(UBYTE *) ( (ULONG) image_buffer + (y0*window_width+x0)*image_bpp), window_width*image_bpp);
++    vo_draw_alpha_rgb32(w, h, src , srca, stride,
++				(UBYTE *) ( (IPTR) draw_buffer + (y0 * draw_buffer_width + x0) * draw_buffer_bpp), 
++				draw_buffer_width * draw_buffer_bpp);
+ }
+ 
+ /******************************** PREINIT ******************************************/
+ static int preinit(const char *arg)
+ {
+-	mp_msg(MSGT_VO, MSGL_INFO, "VO: [cgx_wpa] Welcome man !.\n");
++	mp_msg(MSGT_VO, MSGL_INFO, "VO: [cgx_wpa] Preinit.\n");
+ 
++    /* Parse the subdevice */
+ 	if (!Cgx_GiveArg(arg))
+ 	{
+ 		return -1;	
+ 	}
+-
+-	Cgx_Message();
++	
++	/* Check the if border is disabled by configuration */
++	if (!vo_border)
++	    Cgx_BorderMode = NOBORDER;
+ 
+ 	return 0;
+ }
+@@ -192,8 +288,6 @@
+ {		
+ 	// Window
+ 	ULONG ModeID = INVALID_ID;
+-	static BOOL FirstTime = TRUE;
+-	BOOL WindowActivate = TRUE;
+ 
+ 	My_Window = NULL;
+ 
+@@ -206,6 +300,9 @@
+ 		if ( (dri = GetScreenDrawInfo(My_Screen) ) ) 
+ 		{
+ 			ULONG bw, bh;
++#ifdef __AROS__
++            bw = 0; bh = 0;            
++#else
+ 
+ 			switch(Cgx_BorderMode)
+ 			{
+@@ -221,82 +318,93 @@
+ 						bh = GetSkinInfoAttrA(dri, SI_BorderTopTitle, NULL) +
+ 				     	GetSkinInfoAttrA(dri, SI_BorderBottom, NULL);
+ 			}
++#endif
+ 
+-			if (FirstTime)
++			if (!win_init)
+ 			{
+-				//win_left = (My_Screen->Width - (window_width + bw)) / 2;
+-				//win_top  = (My_Screen->Height - (window_height + bh)) / 2;
+-				win_left = vo_dx;
+-				win_top = vo_dy;
+-				FirstTime = FALSE;
++			    /* Set default values */
++				win_left = (My_Screen->Width - (image_width + bw)) / 2;
++				win_top  = (My_Screen->Height - (image_height + bh)) / 2;
++				win_width = image_width;
++				win_height = image_height;
++				
++				/* Override with geometry */
++				geometry(&win_left, &win_top, &win_width, &win_height, My_Screen->Width, My_Screen->Height);
++				win_init = TRUE;
+ 			}
+-
+-#ifdef CONFIG_GUI
+-		    if (use_gui)
+-				WindowActivate = FALSE;
+-#endif
+ 			
+ 			switch(Cgx_BorderMode)
+ 			{
+ 				case NOBORDER:
+ 					My_Window = OpenWindowTags( NULL,
+-						WA_CustomScreen,    (ULONG) My_Screen,
++						WA_CustomScreen,    (IPTR) My_Screen,
+ 						WA_Left,            win_left,
+ 						WA_Top,             win_top,
+-						WA_InnerWidth,      window_width,
+-						WA_InnerHeight,     window_height,
++						WA_InnerWidth,      win_width,
++						WA_InnerHeight,     win_height,
+ 						WA_SimpleRefresh,   TRUE,
+ 						WA_CloseGadget,     FALSE,
+ 						WA_DepthGadget,     FALSE,
+ 						WA_DragBar,         FALSE,
+ 						WA_Borderless,      TRUE,
+ 						WA_SizeGadget,      FALSE,
+-						WA_Activate,        WindowActivate,
++						WA_Activate,        TRUE,
+ 						WA_IDCMP,           IDCMP_MOUSEBUTTONS | IDCMP_INACTIVEWINDOW | IDCMP_ACTIVEWINDOW  | IDCMP_CHANGEWINDOW | IDCMP_MOUSEMOVE | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY /*| IDCMP_VANILLAKEY*/ | IDCMP_CLOSEWINDOW | IDCMP_NEWSIZE,
+ 						WA_Flags,           WFLG_REPORTMOUSE,
++#ifndef __AROS__
+ 						WA_SkinInfo,				NULL,
++#endif
+ 					TAG_DONE);
+ 					break;
+ 
+ 				case TINYBORDER:
+ 					My_Window = OpenWindowTags( NULL,
+-						WA_CustomScreen,    (ULONG) My_Screen,
++						WA_CustomScreen,    (IPTR) My_Screen,
+ 						WA_Left,            win_left,
+ 						WA_Top,             win_top,
+-						WA_InnerWidth,      window_width,
+-						WA_InnerHeight,     window_height,
++						WA_InnerWidth,      win_width,
++						WA_InnerHeight,     win_height,
+ 						WA_SimpleRefresh,   TRUE,
+ 						WA_CloseGadget,     FALSE,
+ 						WA_DepthGadget,     FALSE,
+ 						WA_DragBar,         FALSE,
+ 						WA_Borderless,      FALSE,
+ 						WA_SizeGadget,      FALSE,
+-						WA_Activate,        WindowActivate,
++						WA_Activate,        TRUE,
+ 						WA_IDCMP,           IDCMP_MOUSEBUTTONS | IDCMP_INACTIVEWINDOW | IDCMP_ACTIVEWINDOW  | IDCMP_CHANGEWINDOW | IDCMP_MOUSEMOVE | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY /*| IDCMP_VANILLAKEY*/ | IDCMP_CLOSEWINDOW | IDCMP_NEWSIZE,
+ 						WA_Flags,           WFLG_REPORTMOUSE,
++#ifndef __AROS__
+ 						WA_SkinInfo,				NULL,
++#endif
+ 					TAG_DONE);	
+ 					break;
+ 
+ 				default:
+ 					My_Window = OpenWindowTags( NULL,
+-						WA_CustomScreen,    (ULONG) My_Screen,
+-						WA_Title,         (ULONG) filename ? MorphOS_GetWindowTitle() : "MPlayer for MorphOS",
+-						WA_ScreenTitle,     (ULONG) "MPlayer " VERSION " for MorphOS",
++						WA_CustomScreen,    (IPTR) My_Screen,
++#ifdef __AROS__
++						WA_Title,         (IPTR) filename ? MorphOS_GetWindowTitle() : "MPlayer for AROS i386",
++						WA_ScreenTitle,     (IPTR) "MPlayer " VERSION " for AROS i386",
++#else
++						WA_Title,         (IPTR) filename ? MorphOS_GetWindowTitle() : "MPlayer for MorphOS",
++						WA_ScreenTitle,     (IPTR) "MPlayer " VERSION " for MorphOS",
++#endif
+ 						WA_Left,            win_left,
+ 						WA_Top,             win_top,
+-						WA_InnerWidth,      window_width,
+-						WA_InnerHeight,     window_height,
++						WA_InnerWidth,      win_width,
++						WA_InnerHeight,     win_height,
+ 						WA_SimpleRefresh,   TRUE,
+ 						WA_CloseGadget,     TRUE,
+ 						WA_DepthGadget,     TRUE,
+ 						WA_DragBar,         TRUE,
+ 						WA_Borderless,      (Cgx_BorderMode == NOBORDER) ? TRUE : FALSE,
+ 						WA_SizeGadget,      FALSE,
+-						WA_Activate,        WindowActivate,
++						WA_Activate,        TRUE,
+ 						WA_IDCMP,           IDCMP_MOUSEBUTTONS | IDCMP_INACTIVEWINDOW | IDCMP_ACTIVEWINDOW  | IDCMP_CHANGEWINDOW | IDCMP_MOUSEMOVE | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY /*| IDCMP_VANILLAKEY*/ | IDCMP_CLOSEWINDOW | IDCMP_NEWSIZE,
+ 						WA_Flags,           WFLG_REPORTMOUSE,
++#ifndef __AROS__
+ 						WA_SkinInfo,        NULL,
++#endif
+ 					TAG_DONE);
+ 			}
+ 
+@@ -324,9 +432,8 @@
+ 
+ 	offset_x = (Cgx_BorderMode == NOBORDER) ? 0 : My_Window->BorderRight;	
+ 	offset_y = (Cgx_BorderMode == NOBORDER) ? 0 : My_Window->BorderTop;
+-
+-	internal_offset_x = 0;
+-	internal_offset_y = 0;
++	draw_buffer_width = My_Window->Width - (My_Window->BorderLeft + My_Window->BorderRight);
++	draw_buffer_height = My_Window->Height - (My_Window->BorderTop + My_Window->BorderBottom);
+ 
+ 	if ( (ModeID = GetVPModeID(&My_Window->WScreen->ViewPort) ) == INVALID_ID) 
+ 	{
+@@ -377,8 +484,9 @@
+ 
+ 	depth = ( FALSE ) ? 16 : GetCyberIDAttr( CYBRIDATTR_DEPTH , ModeID);
+ 
+-	screen_width=window_width;
+-	screen_height=window_height;
++    /* Try selecting a mode that is closest to source image size */
++	screen_width = image_width;
++	screen_height = image_height;
+ 
+ 	if(!WantedModeID)
+ 	{
+@@ -397,8 +505,8 @@
+ 			}
+ 
+ 			if ( GetDisplayInfoData( NULL, &buffer_Dimmension, sizeof(struct DimensionInfo), DTAG_DIMS, ModeID) == sizeof(struct DimensionInfo) &&
+-				     buffer_Dimmension.Nominal.MaxX - buffer_Dimmension.Nominal.MinX + 1 >= window_width &&
+-					 	buffer_Dimmension.Nominal.MaxY - buffer_Dimmension.Nominal.MinY + 1 >= window_height ) 
++				     buffer_Dimmension.Nominal.MaxX - buffer_Dimmension.Nominal.MinX + 1 >= image_width &&
++					 	buffer_Dimmension.Nominal.MaxY - buffer_Dimmension.Nominal.MinY + 1 >= image_height ) 
+ 			{
+ 				break;
+ 			}
+@@ -428,12 +536,12 @@
+ 		WantedModeID ? TAG_IGNORE : SA_Height, screen_height,
+ 	TAG_DONE);
+ 
+-	 if ( ! My_Screen ) 
+-	{
+-		mp_msg(MSGT_VO, MSGL_ERR, "Unable to open the screen ID:%x\n", (int) ModeID);
+-	  uninit();
+-	  return INVALID_ID;
+-	}
++    if ( ! My_Screen ) 
++    {
++        mp_msg(MSGT_VO, MSGL_ERR, "Unable to open the screen ID:%x\n", (int) ModeID);
++        uninit();
++        return INVALID_ID;
++    }
+ 
+ #if PUBLIC_SCREEN
+ 	PubScreenStatus( My_Screen, 0 );
+@@ -442,25 +550,34 @@
+ 	screen_width = My_Screen->Width;
+ 	screen_height = My_Screen->Height;
+ 
+-	offset_x = (screen_width - window_width)/2;
+-	offset_y = (screen_height - window_height)/2;
+-	internal_offset_x = 0;
+-	internal_offset_y = 0;
++    /* Set draw buffer sizes based on screen size and source aspect */
++    if (image_width > image_height)
++    {
++        draw_buffer_width = screen_width;
++        draw_buffer_height = screen_width * ((float)image_height / (float)image_width);
++    }
++    else
++    {
++        draw_buffer_height = screen_height;
++        draw_buffer_width = screen_height * ((float)image_width / (float)image_height);
++    }
++
++	offset_x = (screen_width - draw_buffer_width) / 2;
++	offset_y = (screen_height - draw_buffer_height) / 2;
+ 
+ 	My_Window = OpenWindowTags( NULL,
+ #if PUBLIC_SCREEN
+-			WA_PubScreen,  (ULONG) My_Screen,
++			WA_PubScreen,       (IPTR) My_Screen,
+ #else
+-			WA_CustomScreen,  (ULONG) My_Screen,
++			WA_CustomScreen,    (IPTR) My_Screen,
+ #endif
+-			WA_PubScreen,       (ULONG) My_Screen,
+ 		    WA_Top,             0,
+ 		    WA_Left,            0,
+ 		    WA_Height,          screen_height,
+ 		    WA_Width,           screen_width,
+ 		    WA_SimpleRefresh,   TRUE,
+ 		    WA_CloseGadget,     FALSE,
+-		    WA_DragBar,         TRUE,
++		    WA_DragBar,         FALSE,
+ 			WA_Borderless,      TRUE,
+ 			WA_Backdrop,        TRUE,
+ 		    WA_Activate,        TRUE,
+@@ -479,8 +596,8 @@
+ 
+ 	vo_screenwidth = My_Screen->Width;
+ 	vo_screenheight = My_Screen->Height;
+-	vo_dwidth = vo_screenwidth - 2*offset_x;
+-	vo_dheight = vo_screenheight - 2*offset_y;
++	vo_dwidth = vo_screenwidth - 2 * offset_x;
++	vo_dheight = vo_screenheight - 2 * offset_y;
+ 	vo_fs = 1;
+ 
+ 	Cgx_ControlBlanker(My_Screen, FALSE);
+@@ -491,157 +608,154 @@
+ static int PrepareBuffer(uint32_t in_format, uint32_t out_format)
+ {
+ #define ALIGN 64
+-	if ( ! (image_buffer_mem = (UBYTE *) AllocVec ( image_bpp * window_width * window_height + ALIGN - 1, MEMF_ANY ) ) ) {
+-		uninit();
+-		return -1;
+-	}
++    draw_buffer_mem = (UBYTE *)AllocVec(draw_buffer_bpp * draw_buffer_width * draw_buffer_height + ALIGN - 1, MEMF_ANY );
++    if (!draw_buffer_mem)
++    {
++        uninit();
++        return -1;
++    }
+ 
+-	image_buffer = (APTR) ((((ULONG) image_buffer_mem) + ALIGN - 1) & ~(ALIGN - 1));
++    draw_buffer = (APTR) ((((IPTR) draw_buffer_mem) + ALIGN - 1) & ~(ALIGN - 1));
+ #undef ALIGN
+-
+-#if 1
+-	swsContext= sws_getContextFromCmdLine(image_width, image_height, in_format, window_width, window_height, out_format );
+-  if (!swsContext)
+-	{
+-		uninit();
+-	return -1;
+-	}
+-
+-#else
+-  yuv2rgb_init( image_depth, pixel_format ); // if the pixel format is unknow, mplayer will select just a bad one !
+-#endif
++    
++    /* Prepare scalling context */
++    /* Input: image width, height and format, output buffer width, height and format */
++    swsContext= sws_getContextFromCmdLine(image_width, image_height, in_format, draw_buffer_width, draw_buffer_height, out_format );
++    if (!swsContext)
++    {
++        uninit();
++        return -1;
++    }
+ 
+ 
+ 	return 0;
+ }
+ 
+-
+-/******************************** CONFIG ******************************************/
+-static int config(uint32_t width, uint32_t height, uint32_t d_width,
+-		     uint32_t d_height, uint32_t fullscreen, char *title,
+-		     uint32_t in_format)
++static int config_internal()
+ {
+-	ULONG ModeID = INVALID_ID;
++    ULONG ModeID = INVALID_ID;
+ 
++    /* The window is up, do nothing. */
+ 	if (My_Window) return 0;
+ 
+-	is_fullscreen = fullscreen;
+-
+-	image_format = in_format;
+-
+-	// backup info
+-	image_bpp = 3;
+-	image_width = width & -8;
+-	image_height = height & -2;
+-	window_width = d_width & -8;
+-	window_height = d_height & -2;
+-
+-  if ( fullscreen ) ModeID = Open_FullScreen();
+-	else ModeID = Open_Window();
+-
+-	rp = My_Window->RPort;
+-	UserMsg = My_Window->UserPort;
+-
+-	// CyberIDAttr only works with CGX ID, however on MorphOS there are only CGX Screens
+-	// Anyway, it's easy to check, so lets do it... - Piru
+-	if ( ! IsCyberModeID(ModeID) ) 
+-	{
+-		uninit();
+-		return -1;
+-	}
+-
+- 	if (PrepareBuffer(in_format, IMGFMT_RGB24) < 0) 
+-	{
+-		uninit();
+-		return -1;
+-	}
++    if (is_fullscreen) 
++        ModeID = Open_FullScreen();
++    else
++        ModeID = Open_Window();
++
++    rp = My_Window->RPort;
++    UserMsg = My_Window->UserPort;
++
++    /* This will repaint window during pause and in full screen */
++    InstallLayerHook(rp->Layer, &BackFill_Hook);
++
++    /* CyberIDAttr only works with CGX ID, however on MorphOS there are only CGX Screens
++       Anyway, it's easy to check, so lets do it... - Piru */
++    if (!IsCyberModeID(ModeID)) 
++    {
++        uninit();
++        return -1;
++    }
++
++    if (PrepareBuffer(image_format, draw_buffer_format) < 0) 
++    {
++        uninit();
++        return -1;
++    }
+ 
+-	vo_draw_alpha_func = draw_alpha_rgb24;
+ 
+-	Cgx_Start(My_Window);
++    Cgx_Start(My_Window);
+ 
+ #ifdef CONFIG_GUI
+     if (use_gui)
+-		gui(GUI_SET_WINDOW_PTR, (void *) My_Window);
++        gui(GUI_SET_WINDOW_PTR, (void *) My_Window);
+ #endif
+ 
+-	return 0; // -> Ok
++    return 0; // -> Ok
++}
++
++/******************************** CONFIG ******************************************/
++static int config(uint32_t width, uint32_t height, uint32_t d_width,
++		     uint32_t d_height, uint32_t fullscreen, char *title,
++		     uint32_t in_format)
++{
++	is_fullscreen = fullscreen;
++	image_format = in_format;
++	image_width = width;
++	image_height = height;
++    vo_draw_alpha_func = draw_alpha_rgb32;
++    win_init = FALSE;
++
++    return config_internal();
+ }
+ 
+ /******************************** DRAW_SLICE ******************************************/
+ static int draw_slice(uint8_t *image[], int stride[], int w,int h,int x,int y)
+ {
+-#if 1
+-	uint8_t *dst[3];
+-  int dstStride[3];
+-
+-	dstStride[0] = window_width*image_bpp;
+-	dstStride[1] = 0;
+-	dstStride[2] = 0;
+-
+-	dst[0] = (uint8_t *) ( (ULONG) image_buffer +x*image_bpp) ;
+-	dst[1] = NULL;
+-	dst[2] = NULL; 
+-
+-	sws_scale(swsContext,
+-			image,
+-			stride,
+-			y + internal_offset_y,
+-			h,
+-			dst, 
+-			dstStride);
+-#else
+-	w -= (w%2);
+-	yuv2rgb( (UBYTE *) ( (ULONG) image_buffer + (y*image_width+x)*image_bpp) , image[0], image[1], image[2],\
+-									 w, h, image_width*image_bpp,
+-									 image_width, image_width/2 );
+-#endif
++    uint8_t *dst[3];
++    int dstStride[3];
++
++    dstStride[0] = draw_buffer_width * draw_buffer_bpp;
++    dstStride[1] = 0;
++    dstStride[2] = 0;
++
++    dst[0] = (uint8_t *) ( (IPTR) draw_buffer + x * draw_buffer_bpp) ;
++    dst[1] = NULL;
++    dst[2] = NULL; 
++
++    sws_scale(swsContext,
++                        image,
++                        stride,
++                        y,
++                        h,
++                        dst,
++                        dstStride);
++
+ 	return 0;
+ }
+ /******************************** DRAW_OSD ******************************************/
+ 
+ static void draw_osd(void)
+ {
+-	vo_draw_text(window_width,window_height,vo_draw_alpha_func);
++	vo_draw_text(draw_buffer_width, draw_buffer_height, vo_draw_alpha_func);
+ }
+ 
+ /******************************** FLIP_PAGE ******************************************/
+ static void flip_page(void)
+ {
+ 	WritePixelArray(
+-		image_buffer,	
++		draw_buffer,	
+ 		0,
+ 		0,
+-		window_width*image_bpp,
++		draw_buffer_width * draw_buffer_bpp,
+ 		rp,
+ 		offset_x,
+ 		offset_y,
+-		window_width,
+-		window_height,
+-		RECTFMT_RGB);
+-#warning "use rectfmt_raw if screen pixfmt is suited"
++		draw_buffer_width,
++		draw_buffer_height,
++		RECTFMT_BGRA32);
+ }
+ /******************************** DRAW_FRAME ******************************************/
+ static int draw_frame(uint8_t *src[])
+ {
+-	// Nothing
++	/* Nothing */
+ 	return -1;
+ }
+ 
+ 
+ /***********************/
+-// Just a litle func to help uninit and control
+-// it close screen (if fullscreen), the windows, and free all gfx related stuff
+-// but do not clsoe any libs
++/* Just a litle func to help uninit and control
++   it close screen (if fullscreen), the windows, and free all gfx related stuff
++   but do not close any libs */
+ 
+ static void FreeGfx(void)
+ {
+ #ifdef CONFIG_GUI
+-	if (use_gui)
+-	{
+-		gui(GUI_SET_WINDOW_PTR, (void *) NULL);
+-		mygui->screen = My_Screen;
+-	}
++    if (use_gui)
++    {
++        gui(GUI_SET_WINDOW_PTR, (void *) NULL);
++        mygui->screen = My_Screen;
++    }
+ #endif
+ 
+ 	Cgx_ControlBlanker(My_Screen, TRUE);
+@@ -679,9 +793,9 @@
+ 		My_Window=NULL;
+ 	}
+ 
+-	if (image_buffer_mem) {
+-		FreeVec(image_buffer_mem);
+-		image_buffer_mem = NULL;
++	if (draw_buffer_mem) {
++		FreeVec(draw_buffer_mem);
++		draw_buffer_mem = NULL;
+ 	}
+ }
+ 
+@@ -708,48 +822,44 @@
+ 			return VO_TRUE;
+ 
+ 		case VOCTRL_FULLSCREEN:
+-
+-			is_fullscreen = !is_fullscreen;
+-
+ 			FreeGfx();
+-			if ( config(image_width, image_height, window_width, window_height, is_fullscreen, NULL, image_format) < 0) return VO_FALSE;
++			is_fullscreen = !is_fullscreen;
++			if (config_internal() < 0) 
++			    return VO_FALSE;
+ 
+ 			return VO_TRUE;
+ 
+ 		case VOCTRL_PAUSE:
+ 			Cgx_Stop(My_Window);
+-			InstallLayerHook(rp->Layer, &BackFill_Hook);
+ 			Cgx_ControlBlanker(My_Screen, TRUE);
+ 			return VO_TRUE;					
+ 
+ 		case VOCTRL_RESUME:
+ 			Cgx_Start(My_Window);
+-			InstallLayerHook(rp->Layer, NULL);
+ 			Cgx_ControlBlanker(My_Screen, FALSE);
+ 			return VO_TRUE;
+ 
+ 		case VOCTRL_QUERY_FORMAT:
+ 			return query_format(*(ULONG *)data);
+ 
+-		case VOCTRL_UPDATE_SCREENINFO:
+-			if (is_fullscreen)
+-			{
+-				vo_screenwidth = My_Screen->Width;
+-				vo_screenheight = My_Screen->Height;
+-			}
+-			else
+-			{
+-				struct Screen *s = LockPubScreen ( PubScreenName[0] ? PubScreenName : NULL);
+-				if(s)
+-				{
+-					vo_screenwidth = s->Width;
+-					vo_screenheight = s->Height;
+-					UnlockPubScreen(NULL, s);
+-				}
+-	        }
+-	        aspect_save_screenres(vo_screenwidth, vo_screenheight);
+-			return VO_TRUE;
+-		
++        case VOCTRL_UPDATE_SCREENINFO:
++            if (is_fullscreen)
++            {
++                vo_screenwidth = My_Screen->Width;
++                vo_screenheight = My_Screen->Height;
++            }
++            else
++            {
++                struct Screen *s = LockPubScreen ( PubScreenName[0] ? PubScreenName : NULL);
++                if(s)
++                {
++                    vo_screenwidth = s->Width;
++                    vo_screenheight = s->Height;
++                    UnlockPubScreen(NULL, s);
++                }
++            }
++            aspect_save_screenres(vo_screenwidth, vo_screenheight);
++            return VO_TRUE;
+   }
+   
+ 	return VO_NOTIMPL;
+@@ -758,7 +868,7 @@
+ /******************************** CHECK_EVENTS    ******************************************/
+ static void check_events(void)
+ {
+-	Cgx_CheckEvents(My_Screen, My_Window, &window_height, &window_width, &win_left, &win_top);
++	Cgx_CheckEvents(My_Screen, My_Window, &draw_buffer_height, &draw_buffer_width, &win_left, &win_top);
+ }
+ 
+ static int query_format(uint32_t format)
+diff -ur -x.svn mplayer-svn-src/Makefile mplayer-svn-src-aros/Makefile
+--- mplayer-svn-src/Makefile	2012-04-16 19:19:41.000000000 +0200
++++ mplayer-svn-src-aros/Makefile	2012-04-16 19:19:47.000000000 +0200
+@@ -594,6 +594,33 @@
+ 								gui/morphos/consolegroupclass.c \
+ 								gui/morphos/consolelistclass.c
+ 
++SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
++								gui/morphos/classes.c \
++								gui/morphos/interface.c \
++								gui/morphos/thread.c \
++								gui/morphos/cfg.c \
++								gui/morphos/playlist.c \
++								gui/morphos/appclass.c \
++								gui/morphos/mplayerwindowclass.c \
++								gui/morphos/mplayergroupclass.c \
++								gui/morphos/playlistgroupclass.c \
++								gui/morphos/urlgroupclass.c \
++								gui/morphos/dvddirgroupclass.c \
++								gui/morphos/propertiesgroupclass.c \
++								gui/morphos/prefsgroupclass.c \
++								gui/morphos/prefslistclass.c \
++								gui/morphos/prefsgeneralgroupclass.c \
++								gui/morphos/playlistlistclass.c \
++								gui/morphos/seeksliderclass.c \
++								gui/morphos/volumesliderclass.c \
++								gui/morphos/picturebuttonclass.c \
++								gui/morphos/spacerclass.c \
++								gui/morphos/videoareaclass.c \
++								gui/morphos/poplistclass.c \
++								gui/morphos/popstringclass.c \
++								gui/morphos/prefspopstringclass.c \
++                                aros/aros_stuff.c \
++
+ SRCS_MPLAYER-$(IVTV)         += libao2/ao_ivtv.c libvo/vo_ivtv.c
+ SRCS_MPLAYER-$(JACK)         += libao2/ao_jack.c
+ SRCS_MPLAYER-$(JOYSTICK)     += input/joystick.c
+@@ -635,6 +662,13 @@
+ SRCS_MPLAYER-$(V4L2)          += libao2/ao_v4l2.c
+ SRCS_MPLAYER-$(VDPAU)         += libvo/vo_vdpau.c
+ SRCS_MPLAYER-$(VESA)          += libvo/gtf.c libvo/vo_vesa.c libvo/vesa_lvo.c
++SRCS_MPLAYER-$(CGX_COMMON)    += libvo/cgx_common.c
++SRCS_MPLAYER-$(CGX_OVERLAY)   += libvo/vo_cgx_overlay.c
++SRCS_MPLAYER-$(CGX_OVERLAY_GUI) += libvo/vo_cgx_overlay_gui.c
++SRCS_MPLAYER-$(CGX_WPA)       += libvo/vo_cgx_wpa.c
++SRCS_MPLAYER-$(CGX_VMEM)      += libvo/vo_cgx_vmem.c
++SRCS_MPLAYER-$(AHI)           += libao2/ao_ahi.c
++SRCS_MPLAYER-$(AHI_DEV)       += libao2/ao_ahi_dev.c
+ SRCS_MPLAYER-$(VIDIX)         += libvo/vo_cvidix.c \
+                                  libvo/vosub_vidix.c \
+                                  vidix/vidix.c \
+@@ -753,12 +787,14 @@
+ INSTALL_TARGETS-$(MPLAYER)  += install-mplayer  install-mplayer-man
+ 
+ DIRS =  . \
++        aros \
+         gui \
+         gui/skin \
+         gui/ui \
+         gui/ui/gtk \
+         gui/util \
+         gui/win32 \
++        gui/morphos \
+         gui/wm \
+         input \
+         libaf \
+@@ -833,7 +869,7 @@
+ 	$(CC) -o $@ $^ $(EXTRALIBS)
+ 
+ codec-cfg$(EXESUF): codec-cfg.c codec-cfg.h help_mp.h
+-	$(HOST_CC) -noixemul -O -DCODECS2HTML -I. -Iffmpeg -o $@ $<
++	$(HOST_CC) -O -DCODECS2HTML -I. -Iffmpeg -o $@ $<
+ 
+ codecs.conf.h: codec-cfg$(EXESUF) etc/codecs.conf
+ 	./$^ > $@
+diff -ur -x.svn mplayer-svn-src/morphos_stuff.c mplayer-svn-src-aros/morphos_stuff.c
+--- mplayer-svn-src/morphos_stuff.c	2011-09-26 03:44:40.000000000 +0200
++++ mplayer-svn-src-aros/morphos_stuff.c	2012-04-14 18:49:08.000000000 +0200
+@@ -88,7 +88,11 @@
+ 
+ /***************/
+ 
++#if defined(__AROS__)
++struct RxsLib * RexxSysBase = NULL;
++#else
+ struct Library * RexxSysBase = NULL;
++#endif
+ 
+ static struct MsgPort   *ARexxPort;
+ static char MPLAYER_PORTNAME[PORT_LEN];
+@@ -1083,11 +1087,18 @@
+ #endif
+ /**********************************************************************************************************************/
+ 
+-
++#ifdef __AROS__
++#define BUILD_DATE "14.04.2012"
++const char version[] = "$VER: MPlayer 1.0 ("BUILD_DATE") © MPlayer Team";
++const char muiversion[] = "$VER: MPlayer 1.0 ("BUILD_DATE")";
++const char muititle[] = "MPlayer 1.0 ("BUILD_DATE") "VERSION;
++const char revision[] = VERSION;
++#else
+ const char version[]    = "$VER: MPlayer 1.0 (25.09.2011) © MPlayer Team, Nicolas Det, Fabien Coeurjoly [SVN: r34123]";
+ const char muiversion[] = "$VER: MPlayer 1.0 (25.09.2011)";
+ const char muititle[]   = "MPlayer 1.0 (25.09.2011) [SVN: r34123]";
+ const char revision[]   = "r34123";
++#endif
+ 
+ struct Task * maintask;
+ unsigned long __stack = 524288*4; /* Just to be on the safe side! */
+@@ -1097,15 +1108,23 @@
+ // Yes, global variables ! This way we can init it in mplayer once
+ // and then use it in user_sleep
+ // Not very clean but works great !
+-struct Library *  TimerBase = NULL;
++#ifdef __AROS__
++struct Device * TimerBase = NULL;
++#else
++struct Library *  TimerBase=NULL;
++#endif
+ 
+ // And library
++#ifndef __AROS__
+ struct Library       * AsyncIOBase = NULL;
++#endif
+ struct Library       * AslBase     = NULL;
+ struct IntuitionBase * IntuitionBase = NULL;
+ struct Library       * UtilityBase = NULL;
+ struct Library       * WorkbenchBase = NULL;
++#ifndef __AROS__
+ extern struct Library * SocketBase;
++#endif
+ struct Library *ffmpegSocketBase = NULL; // XXX: check that
+ 
+ UBYTE  TimerDevice = -1; // -1 -> not opened
+@@ -1213,7 +1232,18 @@
+ 		if (!MorphOS_argv) goto fail;
+ 
+ 		memset(MorphOS_argv, 0x00, MorphOS_argc * sizeof(char *) );
+-
++#ifdef __AROS__
++        /* First - application name */
++        MorphOS_argv[0] = malloc(strlen(WBStartup->sm_ArgList[0].wa_Name) + 1);
++        if (!MorphOS_argv[0]) goto fail;
++        strcpy(MorphOS_argv[0], WBStartup->sm_ArgList[0].wa_Name);
++
++        /* Second - clicked file name */
++        MorphOS_argv[1] = malloc(1024);
++        memset(MorphOS_argv[1], 0x00, 1024);
++        NameFromLock(WBStartup->sm_ArgList[1].wa_Lock, MorphOS_argv[1], 1024);
++        AddPart(MorphOS_argv[1], WBStartup->sm_ArgList[1].wa_Name, 1024);
++#else
+ 		for(i = 0; i < MorphOS_argc; i++)
+ 		{
+ 			if(i == 1)
+@@ -1239,6 +1269,7 @@
+ 		{
+ 			MorphOS_argc--;
+ 		}
++#endif
+ 
+ 		*new_argc = MorphOS_argc;
+ 		*new_argv = MorphOS_argv;
+@@ -1332,8 +1363,10 @@
+ 
+ 	Free_Arg();
+ 
++#ifndef __AROS__
+ 	if (SocketBase)    CloseLibrary( SocketBase );
+ 	if (AsyncIOBase)   CloseLibrary( AsyncIOBase );
++#endif
+ 	if (AslBase)       CloseLibrary(AslBase);
+ 	if (!TimerDevice)  CloseDevice( (struct IORequest *) TimerRequest);
+ 	if (TimerRequest)  DeleteIORequest ( (struct IORequest *) TimerRequest );
+@@ -1351,8 +1384,10 @@
+ 
+     maintask = FindTask(NULL);
+ 
++#if !defined(__AROS__)
+ 	// register Fontconfig progress callback
+ 	fontconfig_progress_callback = myfontconfig_progress_callback;
++#endif
+ 
+ 	setlocale(LC_NUMERIC, "C");
+ 
+@@ -1386,21 +1421,31 @@
+ 
+ 	TimerBase = (struct Library *) TimerRequest->tr_node.io_Device;
+ 
++#ifndef __AROS__
+ 	if ( ! ( AsyncIOBase = OpenLibrary( "asyncio.library", 0L) ) ) 
+ 	{
+ 		mp_msg(MSGT_CPLAYER, MSGL_FATAL, "Unable to open asyncio.library\n");
+ 	   	MorphOS_Close();
+ 		return -1;
+ 	}
++#endif
+ 
+-	if (!(UtilityBase = OpenLibrary("utility.library", 50)))
++#ifdef __AROS__
++    if (!(UtilityBase = OpenLibrary("utility.library", 0L)))
++#else
++    if (!(UtilityBase = OpenLibrary("utility.library", 50)))
++#endif
+ 	{
+ 		mp_msg(MSGT_CPLAYER, MSGL_FATAL, "Unable to open utility.library\n");
+ 	   	MorphOS_Close();
+ 		return -1;
+ 	}
+ 
+-	if (!(IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library", 50)))
++#ifdef __AROS__
++    if (!(IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library", 0L)))
++#else
++    if (!(IntuitionBase = (struct IntuitionBase *)OpenLibrary("intuition.library", 50)))
++#endif
+ 	{
+ 		mp_msg(MSGT_CPLAYER, MSGL_FATAL, "Unable to open intuition.library\n");
+ 	   	MorphOS_Close();
+@@ -1464,12 +1509,20 @@
+ 		}
+ 		else
+ 		{
+-			stccpy(windowtitle, "MPlayer for MorphOS", sizeof(windowtitle));
++#ifdef __AROS__
++            stccpy(windowtitle, "MPlayer for AROS i386", sizeof(windowtitle));
++#else
++            stccpy(windowtitle, "MPlayer for MorphOS", sizeof(windowtitle));
++#endif
+ 		}
+ 	}
+ 	return windowtitle;
++#else /* MPLAYER */
++#ifdef __AROS__
++    return "MPlayer for AROS x86";
+ #else
+-	return "MPlayer for MorphOS";
++    return "MPlayer for MorphOS";
++#endif
+ #endif
+ }
+ 
+diff -ur -x.svn mplayer-svn-src/mplayer.c mplayer-svn-src-aros/mplayer.c
+--- mplayer-svn-src/mplayer.c	2012-04-16 21:06:27.000000000 +0200
++++ mplayer-svn-src-aros/mplayer.c	2012-04-21 12:27:50.000000000 +0200
+@@ -1004,6 +1004,9 @@
+ 
+ static void load_per_file_config(m_config_t *conf, const char *const file)
+ {
++/* Disabled, because path concatenation code below is wrong for AROS -
++   creates PROGDIR:conf/VOLUME:path paths. Yes, I'm lazy */
++#if !defined(__AROS__)
+     char *confpath;
+     char cfg[PATH_MAX];
+     const char *name;
+@@ -1030,6 +1033,7 @@
+ 
+         free(confpath);
+     }
++#endif
+ }
+ 
+ static int load_profile_config(m_config_t *conf, const char *const file)
+@@ -4108,6 +4112,9 @@
+             }
+ #endif
+ 
++#ifdef __AROS__
++  gui_handle_events(); /* AREXX HANDLING */
++#endif
+ //============================ Handle PAUSE ===============================
+ 
+             current_module = "pause";
+diff -ur -x.svn mplayer-svn-src/osdep/shmem.c mplayer-svn-src-aros/osdep/shmem.c
+--- mplayer-svn-src/osdep/shmem.c	2012-04-15 21:43:14.000000000 +0200
++++ mplayer-svn-src-aros/osdep/shmem.c	2012-04-15 21:50:48.000000000 +0200
+@@ -23,7 +23,7 @@
+ 
+ #include "config.h"
+ 
+-#if !defined(__MORPHOS__)
++#if !defined(__MORPHOS__) && !defined(__AROS__)
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+diff -ur -x.svn mplayer-svn-src/stream/cache2.c mplayer-svn-src-aros/stream/cache2.c
+--- mplayer-svn-src/stream/cache2.c	2012-04-16 20:50:41.000000000 +0200
++++ mplayer-svn-src-aros/stream/cache2.c	2012-04-21 13:17:46.000000000 +0200
+@@ -80,7 +80,11 @@
+ #include <exec/tasks.h>
+ #include <exec/types.h>
+ #include <dos/dostags.h>
++#if !defined(__AROS__)
+ #include <amitcp/socketbasetags.h>
++#else
++#include <bsdsocket/socketbasetags.h>
++#endif
+ 
+ #include <proto/exec.h>
+ #include <proto/dos.h>
+@@ -594,8 +598,11 @@
+    DEBUG(kprintf("%s Starting\n", CURRENT_TASK));
+ 
+    signal(SIGINT, interrupt_handler);
+-
++#ifdef __AROS__
++    My_StartupMsg = ((struct Process *)FindTask(NULL))->pr_Task.tc_UserData;
++#else
+    if (!(NewGetTaskAttrs(NULL, &My_StartupMsg, sizeof(struct CustomMsg *), TASKINFOTYPE_STARTUPMSG, TAG_DONE))) goto fail;
++#endif
+    if (!My_StartupMsg) goto fail;
+ 
+    s = (cache_vars_t*) My_StartupMsg->s;
+@@ -703,6 +710,10 @@
+ 
+    if(errno != 0) errno = 0;
+ 
++#ifdef __AROS__
++    if (My_StartupMsg) ReplyMsg((struct Message *)My_StartupMsg);
++#endif
++
+    DEBUG(kprintf("%s Bye\n", CURRENT_TASK));
+ }
+ 
+@@ -838,15 +849,25 @@
+ 		 gdvdcss_close();
+ 	}
+ 
++#if !defined(__AROS__)
+ 	if ( ! (cachetask = CreateNewProcTags(  NP_CodeType,       CODETYPE_PPC,
+ 						 NP_Entry,                  (ULONG) CacheTask,
+ 						 NP_StartupMsg,             (ULONG) stream->StartupMsg,
++#else
++    if ( ! (cachetask = CreateNewProcTags(
++                         NP_Entry,                  (ULONG) CacheTask,
++                         NP_UserData,               (IPTR)stream->StartupMsg,
++#endif
+ 						 //NP_Priority,               1,
+ 						 NP_Input,                  Input(),
+ 						 NP_CloseInput,             FALSE,
+ 						 NP_Output,                 Output(),
+ 						 NP_CloseOutput,            FALSE,
++#if !defined(__AROS__)
+ 						 NP_PPCStackSize,           512*1024,
++#else
++						 NP_StackSize,              512*1024,
++#endif
+ 						 NP_Name,                   "MPlayer Cache Thread",
+ 						 TAG_DONE) ) ) return -1; // Unable to create the Process
+ 
+diff -ur -x.svn mplayer-svn-src/stream/cookies.c mplayer-svn-src-aros/stream/cookies.c
+--- mplayer-svn-src/stream/cookies.c	2010-04-11 17:50:47.000000000 +0200
++++ mplayer-svn-src-aros/stream/cookies.c	2012-04-14 17:39:32.000000000 +0200
+@@ -23,6 +23,9 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
++#ifdef __AROS__
++#define SIZE_MAX INT32_MAX
++#endif
+ #include <fcntl.h>
+ #include <string.h>
+ #include <unistd.h>
+diff -ur -x.svn mplayer-svn-src/stream/http.c mplayer-svn-src-aros/stream/http.c
+--- mplayer-svn-src/stream/http.c	2012-04-15 21:43:03.000000000 +0200
++++ mplayer-svn-src-aros/stream/http.c	2012-04-15 21:50:39.000000000 +0200
+@@ -33,6 +33,10 @@
+ #include <ws2tcpip.h>
+ #endif
+ 
++#if defined(__AROS__)
++#define atoll(x) atol(x)
++#endif
++
+ #include "http.h"
+ #include "url.h"
+ #include "mp_msg.h"
+diff -ur -x.svn mplayer-svn-src/stream/librtsp/rtsp_rtp.c mplayer-svn-src-aros/stream/librtsp/rtsp_rtp.c
+--- mplayer-svn-src/stream/librtsp/rtsp_rtp.c	2010-12-15 02:10:30.000000000 +0100
++++ mplayer-svn-src-aros/stream/librtsp/rtsp_rtp.c	2012-04-14 16:59:00.000000000 +0200
+@@ -47,6 +47,10 @@
+ #include "stream/freesdp/parser.h"
+ #include "libavutil/avstring.h"
+ 
++#ifdef __AROS__
++#include <proto/socket.h>
++#endif
++
+ #define RTSP_DEFAULT_PORT 31336
+ #define MAX_LENGTH 256
+ 
+@@ -327,11 +331,15 @@
+   /* if multicast address, add membership */
+   if ((ntohl (sin.sin_addr.s_addr) >> 28) == 0xe)
+   {
++#ifdef __AROS__ /* AROS:CHANGED */
++    if(1)
++#else
+     struct ip_mreq mcast;
+     mcast.imr_multiaddr.s_addr = sin.sin_addr.s_addr;
+     mcast.imr_interface.s_addr = 0;
+ 
+     if (setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mcast, sizeof (mcast)))
++#endif
+     {
+       mp_msg (MSGT_OPEN, MSGL_ERR, "IP_ADD_MEMBERSHIP failed\n");
+ 	  closesocket (s);
+diff -ur -x.svn mplayer-svn-src/stream/network.c mplayer-svn-src-aros/stream/network.c
+--- mplayer-svn-src/stream/network.c	2011-09-22 12:14:45.000000000 +0200
++++ mplayer-svn-src-aros/stream/network.c	2012-04-14 17:36:48.000000000 +0200
+@@ -24,9 +24,14 @@
+ #include <proto/socket.h>
+ #include <proto/exec.h>
+ #include <exec/types.h>
++#if !defined(__AROS__)
+ #include <amitcp/socketbasetags.h>
+ 
+ #include <sys/filio.h>
++#else
++#include <bsdsocket/socketbasetags.h>
++#include <sys/ioctl.h>
++#endif
+ #include <errno.h>
+ 
+ struct Library * SocketBase = NULL;
+diff -ur -x.svn mplayer-svn-src/stream/stream_dvd.c mplayer-svn-src-aros/stream/stream_dvd.c
+--- mplayer-svn-src/stream/stream_dvd.c	2012-04-15 21:43:03.000000000 +0200
++++ mplayer-svn-src-aros/stream/stream_dvd.c	2012-04-16 21:27:23.000000000 +0200
+@@ -194,7 +194,7 @@
+   return maxid + 1;
+ }
+ 
+-static int dvd_lang_from_sid(stream_t *stream, int id) {
++int dvd_lang_from_sid(stream_t *stream, int id) {
+   int i;
+   dvd_priv_t *d;
+   if (!stream) return 0;
+diff -ur -x.svn mplayer-svn-src/stream/stream_dvdnav.c mplayer-svn-src-aros/stream/stream_dvdnav.c
+--- mplayer-svn-src/stream/stream_dvdnav.c	2012-04-15 21:43:03.000000000 +0200
++++ mplayer-svn-src-aros/stream/stream_dvdnav.c	2012-04-16 21:27:47.000000000 +0200
+@@ -408,7 +408,7 @@
+   return len;
+ }
+ 
+-static int mp_dvdnav_lang_from_sid(stream_t *stream, int sid);
++int mp_dvdnav_lang_from_sid(stream_t *stream, int sid);
+ static int mp_dvdnav_lang_from_aid(stream_t *stream, int sid);
+ 
+ static int control(stream_t *stream, int cmd, void* arg) {
+@@ -858,7 +858,7 @@
+  * \param sid: physical subtitle id
+  * \return 0 on error, otherwise language id
+  */
+-static int mp_dvdnav_lang_from_sid(stream_t *stream, int sid) {
++int mp_dvdnav_lang_from_sid(stream_t *stream, int sid) {
+     uint8_t k;
+     uint16_t lang;
+     dvdnav_priv_t *priv = stream->priv;
+diff -ur -x.svn mplayer-svn-src/stream/stream_file.c mplayer-svn-src-aros/stream/stream_file.c
+--- mplayer-svn-src/stream/stream_file.c	2011-09-22 12:14:48.000000000 +0200
++++ mplayer-svn-src-aros/stream/stream_file.c	2012-04-21 12:25:48.000000000 +0200
+@@ -173,7 +173,23 @@
+ #ifndef __MINGW32__
+       openmode |= S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH;
+ #endif
++#if defined(__AROS__)
++      {
++          /* Don't allow opening directories */
++          struct stat st;
++          if(stat(filename, &st) != -1)
++          {
++              if(!S_ISDIR(st.st_mode))
++                  f=open(filename,m, openmode);
++              else
++                  f = -1;
++          }
++          else
++              f = -1;
++      }
++#else
+       f=open(filename,m, openmode);
++#endif
+     if(f<0) {
+       mp_msg(MSGT_OPEN,MSGL_ERR,MSGTR_FileNotFound,filename);
+       m_struct_free(&stream_opts,opts);
+diff -ur -x.svn mplayer-svn-src/stream/stream.h mplayer-svn-src-aros/stream/stream.h
+--- mplayer-svn-src/stream/stream.h	2012-04-16 20:46:04.000000000 +0200
++++ mplayer-svn-src-aros/stream/stream.h	2012-04-16 21:00:11.000000000 +0200
+@@ -29,6 +29,11 @@
+ #include <sys/types.h>
+ #include <fcntl.h>
+ 
++#if defined(__AROS__)
++#define lseek64 lseek
++#define off64_t off_t
++#endif
++
+ #ifndef O_BINARY
+ #define O_BINARY 0
+ #endif
+@@ -347,11 +352,11 @@
+ static inline int stream_seek(stream_t *s, off_t pos)
+ {
+ 
+-  mp_dbg(MSGT_DEMUX, MSGL_DBG3, "seek to 0x%"PRIX64"\n", pos);
++  mp_dbg(MSGT_DEMUX, MSGL_DBG3, "seek to 0x%"PRIX32"\n", pos);
+ 
+   if (pos < 0) {
+     mp_msg(MSGT_DEMUX, MSGL_ERR,
+-           "Invalid seek to negative position %"PRIx64"!\n", pos);
++           "Invalid seek to negative position %"PRIx32"!\n", pos);
+     pos = 0;
+   }
+   if(pos<s->pos){
+diff -ur -x.svn mplayer-svn-src/stream/tcp.c mplayer-svn-src-aros/stream/tcp.c
+--- mplayer-svn-src/stream/tcp.c	2010-07-12 01:32:26.000000000 +0200
++++ mplayer-svn-src-aros/stream/tcp.c	2012-04-14 17:38:36.000000000 +0200
+@@ -25,7 +25,9 @@
+ #include <proto/exec.h>
+ #include <exec/types.h>
+ 
++#if !defined(__AROS__)
+ #include <sys/filio.h>
++#endif
+ 
+ #endif
+ 
+diff -ur -x.svn mplayer-svn-src/stream/udp.c mplayer-svn-src-aros/stream/udp.c
+--- mplayer-svn-src/stream/udp.c	2010-01-06 17:51:06.000000000 +0100
++++ mplayer-svn-src-aros/stream/udp.c	2012-04-14 17:39:05.000000000 +0200
+@@ -57,7 +57,9 @@
+   socklen_t err_len;
+   fd_set set;
+   struct sockaddr_in server_address;
++#if !defined(__AROS__)
+   struct ip_mreq mcast;
++#endif
+   struct timeval tv;
+   struct hostent *hp;
+   int reuse=reuse_socket;
+@@ -161,11 +163,15 @@
+ 
+   if ((ntohl (server_address.sin_addr.s_addr) >> 28) == 0xe)
+   {
++#ifdef __AROS__
++    if(1)
++#else
+     mcast.imr_multiaddr.s_addr = server_address.sin_addr.s_addr;
+     mcast.imr_interface.s_addr = 0;
+ 
+     if (setsockopt (socket_server_fd, IPPROTO_IP,
+                     IP_ADD_MEMBERSHIP, &mcast, sizeof (mcast)))
++#endif
+     {
+       mp_msg (MSGT_NETWORK, MSGL_ERR, "IP_ADD_MEMBERSHIP failed (do you have multicasting enabled in your kernel?)\n");
+       closesocket (socket_server_fd);
+diff -ur -x.svn mplayer-svn-src/udp_sync.c mplayer-svn-src-aros/udp_sync.c
+--- mplayer-svn-src/udp_sync.c	2011-09-22 12:25:28.000000000 +0200
++++ mplayer-svn-src-aros/udp_sync.c	2012-04-14 16:06:12.000000000 +0200
+@@ -95,12 +95,19 @@
+ 
+     static int sockfd = -1;
+     if (sockfd == -1) {
++#if !defined(__AROS__)
+ #if HAVE_WINSOCK2_H
+         DWORD tv = 30000;
+ #else
+         struct timeval tv = { .tv_sec = 30 };
+ #endif
+         struct sockaddr_in servaddr = { 0 };
++#else
++        struct sockaddr_in servaddr = { 0 };
++        struct timeval tv;
++        tv.tv_sec = 30;
++        tv.tv_usec = 0;
++#endif
+ 
+         startup();
+         sockfd = socket(AF_INET, SOCK_DGRAM, 0);

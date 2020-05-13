@@ -1,0 +1,45 @@
+.:Files:.
+
+inttypes.h
+
+    Use instead of original AROS header, because AROS does not have
+    required macro definitions.
+
+fnmatch.[ho]
+glob.[ho]
+
+    These files are given in binary form of i386 as they are not present
+    in AROS clib.
+
+.:General:.
+
+Source code quality is beta. A number of features have been modified. Look
+for #ifdef __AROS__ or #ifndef __AROS__.
+
+This pacakge ratains .svn directories for easier update from mplayer
+repository.
+
+
+To build the package from linux, you need real cross compiler. 
+
+Build is done by using following commands:
+
+./configure --target=i686-aros --disable-mencoder --enable-cross-compile 
+--cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui 
+--disable-sdl --disable-unrarexec --enable-liba52-internal --enable-menu
+
+make
+
+Build without libdvdcss is done by using following commands:
+
+./configure --target=i686-aros --disable-mencoder --enable-cross-compile 
+--cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui 
+--disable-sdl --disable-unrarexec --enable-liba52-internal --enable-menu 
+--disable-libdvdcss-internal
+
+To build the package from AROS, use the following commands
+
+./configure --target=i686-aros --disable-mencoder --enable-runtime-cpudetection 
+--enable-gui --disable-sdl --disable-unrarexec --enable-liba52-internal 
+--enable-menu
+

@@ -1,0 +1,29 @@
+# Write your default config options here!
+
+# you can set up a list of vo with their own options. The one below is what mplayer handles by default.
+#vo=cgx_overlay::PLANAR,cgx_wpa
+
+# device:unit on which dvd drive is connected.
+dvd-device=ide.device:3
+
+# averages audio/video synchronisation delays, and in pratice gives a smoother playback.
+autosync=30
+
+# enable screenshot filter-> press s to capture.
+#vf=screenshot
+
+# enable menu -> press c to show.
+#menu=1
+menu-keepdir=1
+
+#ass=1
+#ass-color=0xffff0080
+
+# you can increase ac3 level with this option instead of using -af volume=<gain> that causes more distortion.
+a52volume=10
+
+quiet=1
+#v=1
+#fs=1
+#fixed-vo=1
+
