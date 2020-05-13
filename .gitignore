@@ -1,4 +1,4 @@
-*.[od]
+*.[oda]
 *.exe
 *.ho
 codec-cfg
@@ -13,7 +13,7 @@ mencoder
 mplayer
 tags
 TAGS
-version.h
+.version
 debian/changelog
 debian/*.debhelper.log
 DOCS/codecs-status.html
