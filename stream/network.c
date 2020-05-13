@@ -20,6 +20,23 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#ifdef __MORPHOS__
+#include <proto/socket.h>
+#include <proto/exec.h>
+#include <exec/types.h>
+#if !defined(__AROS__)
+#include <amitcp/socketbasetags.h>
+
+#include <sys/filio.h>
+#else
+#include <bsdsocket/socketbasetags.h>
+#include <sys/ioctl.h>
+#endif
+#include <errno.h>
+
+struct Library * SocketBase = NULL;
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -113,6 +130,25 @@ const mime_struct_t mime_type_table[] = {
 streaming_ctrl_t *
 streaming_ctrl_new(void) {
 	streaming_ctrl_t *streaming_ctrl = calloc(1, sizeof(*streaming_ctrl));
+#ifdef __MORPHOS__
+	if (!SocketBase)
+	{
+		if ( ! (SocketBase = OpenLibrary("bsdsocket.library", 0L) ) )
+		{
+			return NULL;
+		}
+		else
+		{
+			if(0)
+			//if(SocketBaseTags(SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (ULONG) &errno, SBTM_SETVAL(SBTC_LOGTAGPTR), (ULONG) "MPlayer", TAG_DONE))
+			{
+				CloseLibrary(SocketBase);
+				SocketBase = NULL;
+				return NULL;
+			}
+		}
+	}
+#endif	  
 	if( streaming_ctrl==NULL ) {
 		mp_msg(MSGT_NETWORK,MSGL_FATAL,MSGTR_MemAllocFailed);
 		return NULL;
@@ -127,6 +163,13 @@ streaming_ctrl_free( streaming_ctrl_t *streaming_ctrl ) {
 	free(streaming_ctrl->buffer);
 	free(streaming_ctrl->data);
 	free(streaming_ctrl);
+#ifdef __MORPHOS__
+	if(SocketBase)
+	{
+	  	CloseLibrary(SocketBase);
+		SocketBase = NULL;
+	}
+#endif
 }
 
 URL_t*
@@ -186,7 +229,7 @@ check4proxies( URL_t *url ) {
 }
 
 int
-http_send_request( URL_t *url, off_t pos ) {
+http_send_request( URL_t *url, quad_t pos ) {
 	HTTP_header_t *http_hdr;
 	URL_t *server_url;
 	char str[256];
@@ -372,7 +415,7 @@ http_authenticate(HTTP_header_t *http_hdr, URL_t *url, int *auth_retry) {
 }
 
 int
-http_seek( stream_t *stream, off_t pos ) {
+http_seek( stream_t *stream, quad_t pos ) {
 	HTTP_header_t *http_hdr = NULL;
 	int fd;
 	if( stream==NULL ) return 0;
@@ -468,7 +511,7 @@ nop_streaming_read( int fd, char *buffer, int size, streaming_ctrl_t *stream_ctr
 }
 
 int
-nop_streaming_seek( int fd, off_t pos, streaming_ctrl_t *stream_ctrl ) {
+nop_streaming_seek( int fd, quad_t pos, streaming_ctrl_t *stream_ctrl ) {
 	return -1;
 }
 
@@ -484,4 +527,86 @@ void fixup_network_stream_cache(stream_t *stream) {
     mp_msg(MSGT_NETWORK,MSGL_INFO,MSGTR_MPDEMUX_NW_CacheSizeSetTo, stream_cache_size);
   }
 }
+
+#if __MORPHOS__
+
+void socket_block(int socket_fd, char val)
+{
+	IoctlSocket(socket_fd, FIONBIO, &val);
+	errno = EINPROGRESS;
+}
+
+int myrecv(int socket_fd, unsigned char *buf, int size, int glag)
+{
+    int len, fd_max, ret;
+    fd_set rfds;
+    struct timeval tv;
+
+	for (;;)
+	{
+		if (stream_check_interrupt(500))
+			return -1;
+
+		fd_max = socket_fd;
+        FD_ZERO(&rfds);
+		FD_SET(socket_fd, &rfds);
+        tv.tv_sec = 0;
+        tv.tv_usec = 100 * 1000;
+		ret = select(fd_max + 1, &rfds, NULL, NULL, &tv);
+		if (ret > 0 && FD_ISSET(socket_fd, &rfds))
+		{
+			len = recv(socket_fd, buf, size, 0);
+			if (len < 0)
+			{
+				if (errno != EINTR && errno != EAGAIN)
+					return -1;
+			}
+			else
+				return len;
+		}
+		else if (ret < 0)
+		{
+            return -1;
+        }
+    }
+}
+
+int mysend(int socket_fd, unsigned char *buf, int size, int flag)
+{
+    int ret, size1, fd_max, len;
+    fd_set wfds;
+    struct timeval tv;
+
+    size1 = size;
+	while (size > 0)
+	{
+		if (stream_check_interrupt(500))
+			return -1;
+		fd_max = socket_fd;
+        FD_ZERO(&wfds);
+		FD_SET(socket_fd, &wfds);
+        tv.tv_sec = 0;
+        tv.tv_usec = 100 * 1000;
+		ret = select(fd_max + 1, NULL, &wfds, NULL, &tv);
+		if (ret > 0 && FD_ISSET(socket_fd, &wfds))
+		{
+			len = send(socket_fd, buf, size, 0);
+			if (len < 0)
+			{
+				if (errno != EINTR && errno != EAGAIN)
+					return -1;
+                continue;
+            }
+            size -= len;
+            buf += len;
+		}
+		else if (ret < 0)
+		{
+            return -1;
+        }
+    }
+    return size1 - size;
+}
+
+#endif
 

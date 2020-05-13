@@ -38,7 +38,9 @@
 #else
 #include <winsock2.h>
 #endif
+#ifndef __MORPHOS__
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <fcntl.h>
 #include <stdlib.h>

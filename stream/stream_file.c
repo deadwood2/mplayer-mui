@@ -16,6 +16,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#define _LARGEFILE64_SOURCE 1
+
 #include "config.h"
 
 #include <stdio.h>
@@ -32,6 +34,8 @@
 #include "help_mp.h"
 #include "m_option.h"
 #include "m_struct.h"
+
+// __MORPHOS
 
 static struct stream_priv_s {
   char* filename;
@@ -72,16 +76,16 @@ static int write_buffer(stream_t *s, char* buffer, int len) {
   return len;
 }
 
-static int seek(stream_t *s,off_t newpos) {
+static int seek(stream_t *s,quad_t newpos) {
   s->pos = newpos;
-  if(lseek(s->fd,s->pos,SEEK_SET)<0) {
+  if(lseek64(s->fd,(off64_t) s->pos,SEEK_SET)<0) {
     s->eof=1;
     return 0;
   }
   return 1;
 }
 
-static int seek_forward(stream_t *s,off_t newpos) {
+static int seek_forward(stream_t *s,quad_t newpos) {
   if(newpos<s->pos){
     mp_msg(MSGT_STREAM,MSGL_INFO,"Cannot seek backward in linear streams!\n");
     return 0;
@@ -99,12 +103,12 @@ static int seek_forward(stream_t *s,off_t newpos) {
 static int control(stream_t *s, int cmd, void *arg) {
   switch(cmd) {
     case STREAM_CTRL_GET_SIZE: {
-      off_t size;
+      quad_t size;
 
-      size = lseek(s->fd, 0, SEEK_END);
-      lseek(s->fd, s->pos, SEEK_SET);
-      if(size != (off_t)-1) {
-        *((off_t*)arg) = size;
+	  size = lseek64(s->fd, 0, SEEK_END);
+	  lseek64(s->fd, (off64_t) s->pos, SEEK_SET);
+      if(size != (quad_t)-1) {
+        *((quad_t*)arg) = size;
         return 1;
       }
     }
@@ -115,7 +119,7 @@ static int control(stream_t *s, int cmd, void *arg) {
 static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
   int f;
   mode_t m = 0;
-  off_t len;
+  quad_t len;
   unsigned char *filename;
   struct stream_priv_s* p = (struct stream_priv_s*)opts;
 
@@ -169,7 +173,23 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
 #ifndef __MINGW32__
       openmode |= S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH;
 #endif
+#if defined(__AROS__)
+      {
+          /* Don't allow opening directories */
+          struct stat st;
+          if(stat(filename, &st) != -1)
+          {
+              if(!S_ISDIR(st.st_mode))
+                  f=open(filename,m, openmode);
+              else
+                  f = -1;
+          }
+          else
+              f = -1;
+      }
+#else
       f=open(filename,m, openmode);
+#endif
     if(f<0) {
       mp_msg(MSGT_OPEN,MSGL_ERR,MSGTR_FileNotFound,filename);
       m_struct_free(&stream_opts,opts);
@@ -177,7 +197,7 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
     }
   }
 
-  len=lseek(f,0,SEEK_END); lseek(f,0,SEEK_SET);
+  len=lseek64(f,0,SEEK_END); lseek64(f,0,SEEK_SET);
 #ifdef __MINGW32__
   // seeks on stdin incorrectly succeed on MinGW
   if(f==0)

@@ -16,6 +16,14 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#ifdef __MORPHOS__
+#include "morphos_stuff.h"
+#include <proto/icon.h>
+#include <workbench/workbench.h>
+#include <workbench/icon.h>
+#include <workbench/startup.h>
+#endif
+
 #include "config.h"
 
 #include <errno.h>
@@ -35,6 +43,13 @@
 #if defined(__MINGW32__) || defined(__CYGWIN__)
 #define _UWIN 1  /*disable Non-underscored versions of non-ANSI functions as otherwise int eof would conflict with eof()*/
 #include <windows.h>
+#endif
+
+#ifdef __MORPHOS__
+#include <proto/dos.h>
+#undef lseek
+#undef truncate
+#undef ftruncate
 #endif
 
 #ifndef __MINGW32__
@@ -138,6 +153,12 @@
 #include "stream/stream_dvd.h"
 #endif
 
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+extern char * _ProgramName;
+#endif
+#endif
+
 int slave_mode;
 int player_idle_mode;
 int quiet;
@@ -149,6 +170,8 @@ static int max_framesize;
 
 int noconsolecontrols;
 //**************************************************************************//
+
+#define USE_ICONV
 
 // Not all functions in mplayer.c take the context as an argument yet
 static MPContext mpctx_s = {
@@ -164,7 +187,7 @@ static MPContext mpctx_s = {
 #endif
 };
 
-static MPContext *mpctx = &mpctx_s;
+MPContext *mpctx = &mpctx_s;
 
 int fixed_vo;
 
@@ -327,6 +350,15 @@ int volstep = 3; ///< step size of mixer changes
 static char *prog_path;
 static int crash_debug;
 #endif
+
+#ifdef __MORPHOS__
+extern int altivec_disabled;
+APTR OldWinPtr;
+struct Process *MyProcess;
+#endif
+
+#include "mpcommon.h"
+#include "command.h"
 
 /* This header requires all the global variable declarations. */
 #include "cfg-mplayer.h"
@@ -591,6 +623,12 @@ void uninit_player(unsigned int mask)
             free_demuxer(mpctx->demuxer);
         }
         mpctx->demuxer = NULL;
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+		if (use_gui)
+			gui(GUI_SET_DEMUXER, NULL);
+#endif
+#endif
     }
 
     // kill the cache process:
@@ -727,6 +765,10 @@ void exit_player_with_rc(enum exit_reason how, int rc)
 
     current_module = "exit_player";
 
+#ifdef __MORPHOS__
+	// see morphos_stuff.c
+	MorphOS_Close();
+#endif
     if (mpctx->playtree_iter)
         play_tree_iter_free(mpctx->playtree_iter);
     mpctx->playtree_iter = NULL;
@@ -768,7 +810,7 @@ void exit_player(enum exit_reason how)
     exit_player_with_rc(how, 1);
 }
 
-#ifndef __MINGW32__
+#if !defined(__MINGW32__)  && !defined(__MORPHOS__)
 static void child_sighandler(int x)
 {
     pid_t pid;
@@ -800,7 +842,7 @@ static void exit_sighandler(int x)
         exit(1);
     if (sig_count > 6) {
         // can't stop :(
-#ifndef __MINGW32__
+#if !defined (_MINGW32) && !defined(__MORPHOS__)
         kill(getpid(), SIGKILL);
 #endif
     }
@@ -962,6 +1004,9 @@ static int try_load_config(m_config_t *conf, const char *file)
 
 static void load_per_file_config(m_config_t *conf, const char *const file)
 {
+/* Disabled, because path concatenation code below is wrong for AROS -
+   creates PROGDIR:conf/VOLUME:path paths. Yes, I'm lazy */
+#if !defined(__AROS__)
     char *confpath;
     char cfg[PATH_MAX];
     const char *name;
@@ -988,6 +1033,7 @@ static void load_per_file_config(m_config_t *conf, const char *const file)
 
         free(confpath);
     }
+#endif
 }
 
 static int load_profile_config(m_config_t *conf, const char *const file)
@@ -1072,6 +1118,12 @@ void add_subtitles(char *filename, float fps, int noerr)
     if (filename == NULL || mpctx->set_of_sub_size >= MAX_SUBTITLE_FILES)
         return;
 
+#ifdef __MORPHOS__
+	  /* Disable requesters */
+	OldWinPtr = MyProcess->pr_WindowPtr;
+	MyProcess->pr_WindowPtr = (APTR)-1;
+#endif
+
     subd = sub_read_file(filename, fps);
 #ifdef CONFIG_ASS
     if (ass_enabled)
@@ -1089,6 +1141,11 @@ void add_subtitles(char *filename, float fps, int noerr)
 #endif
         mp_msg(MSGT_CPLAYER, noerr ? MSGL_WARN : MSGL_ERR, MSGTR_CantLoadSub,
                filename_recode(filename));
+
+#ifdef __MORPHOS__
+	    /* Enable requesters */
+	    MyProcess->pr_WindowPtr = OldWinPtr;
+#endif
 
 #ifdef CONFIG_ASS
     if (!asst && !subd)
@@ -1112,7 +1169,14 @@ static int add_vob_subtitle(const char *vobname, const char *const ifo, int forc
     if (!vobname)
         return 0;
 
-    assert(!vo_vobsub);
+#ifndef __MORPHOS__
+	assert(!vo_vobsub);
+#else
+	if(vo_vobsub)
+	{
+		return 0;
+	}
+#endif
 
     vo_vobsub = vobsub_open(vobname, ifo, force, spu);
 
@@ -2543,7 +2607,7 @@ static void pause_loop(void)
     if (mpctx->audio_out && mpctx->sh_audio)
         mpctx->audio_out->pause();  // pause audio, keep data if possible
 
-    while ((cmd = mp_input_get_cmd(20, 1, 1)) == NULL || cmd->pausing == 4) {
+	while ((cmd = mp_input_get_cmd(20, 1, 1)) == NULL || cmd->pausing == 4 || cmd->id == MP_CMD_SCREENSHOT) { // __MORPHOS__
         if (cmd) {
             cmd = mp_input_get_cmd(0, 1, 0);
             run_command(mpctx, cmd);
@@ -2559,6 +2623,12 @@ static void pause_loop(void)
             if (guiInfo.Playing != GUI_PAUSE || (rel_seek_secs || abs_seek_pos))
                 break;
         }
+#ifdef __MORPHOS__
+		else
+		{
+            gui_handle_events(); /* AREXX HANDLING */
+		}
+#endif
 #endif
 #ifdef CONFIG_MENU
         if (vf_menu)
@@ -2761,6 +2831,12 @@ int main(int argc, char *argv[])
     int profile_config_loaded;
     int i;
 
+#ifdef __MORPHOS__
+	// see morphos_stuff.c
+	MyProcess = (struct Process *)FindTask(NULL);
+	if (MorphOS_Open(argc, argv) < 0) exit_player(EXIT_ERROR);
+#endif
+
     common_preinit();
 
     // Create the config context and register the options
@@ -2772,6 +2848,9 @@ int main(int argc, char *argv[])
     // Preparse the command line
     m_config_preparse_command_line(mconfig, argc, argv);
 
+    // Preparse the command line
+    m_config_preparse_command_line(mconfig, argc, argv);
+
 #ifdef CONFIG_TV
     stream_tv_defaults.immediate = 1;
 #endif
@@ -2779,9 +2858,60 @@ int main(int argc, char *argv[])
     if (argc > 1 && argv[1] &&
         (!strcmp(argv[1], "-gui") || !strcmp(argv[1], "-nogui"))) {
         use_gui = !strcmp(argv[1], "-gui");
-    } else if (argv[0] && strstr(mp_basename(argv[0]), GMPlayer)) {
+	} else /*if (argv[0] && strstr(mp_basename(argv[0]), GMPlayer)) {
         use_gui = 1;
-    }
+	}*/
+	if ( argv[0] && *argv[0]) // __MORPHOS__
+	{
+	    char *base = strrchr(argv[0], '/');
+	    if (!base)
+			base = strrchr(argv[0], '\\');
+	    if (!base)
+			base = argv[0];
+		if(stristr(base, "gmplayer"))
+			use_gui=1;
+	}
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+	// Worbbench start...
+	// Program named gmplayer?
+	else if(stristr(_ProgramName, "gmplayer"))
+	{
+		use_gui = 1;
+	}
+	// Look for GUI tooltype in icon or project icon
+	else
+	{
+		struct WBStartup *WBStartup = (struct WBStartup *) argv;
+		struct DiskObject *dobj	= GetDiskObject(WBStartup->sm_ArgList[0].wa_Name);
+
+		if (dobj)
+		{
+			STRPTR tt;
+			if ((tt = FindToolType(dobj->do_ToolTypes, "GUI")))
+			{
+				use_gui = 1;
+			}
+			FreeDiskObject(dobj);
+		}
+
+		if(!use_gui && WBStartup->sm_NumArgs > 1)
+		{
+			dobj = GetDiskObject(WBStartup->sm_ArgList[1].wa_Name);
+
+			if (dobj)
+			{
+				STRPTR tt;
+				if ((tt = FindToolType(dobj->do_ToolTypes, "GUI")))
+				{
+					use_gui = 1;
+				}
+				FreeDiskObject(dobj);
+			}
+		}
+	}
+#endif
+#endif
 
     parse_cfgfiles(mconfig);
 
@@ -2792,7 +2922,17 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    mpctx->playtree = m_config_parse_mp_command_line(mconfig, argc, argv);
+#ifdef __MORPHOS__
+	{
+		int new_argc;
+		char **new_argv;
+		MorphOS_ParseArg(argc, argv, &new_argc, &new_argv);
+
+		mpctx->playtree = m_config_parse_mp_command_line(mconfig, new_argc, new_argv);
+	}
+#else
+	mpctx->playtree = m_config_parse_mp_command_line(mconfig, argc, argv);
+#endif
     if (mpctx->playtree == NULL) {
         opt_exit = 1;
     } else {
@@ -2845,11 +2985,15 @@ int main(int argc, char *argv[])
         play_tree_iter_free(mpctx->playtree_iter);
         mpctx->playtree_iter = NULL;
 
+#ifndef __MORPHOS__
         if (getcwd(cwd, PATH_MAX) != (char *)NULL) {
             strcat(cwd, "/");
             // Prefix relative paths with current working directory
             play_tree_add_bpf(mpctx->playtree, cwd);
         }
+#else
+		play_tree_add_bpf(mpctx->playtree, "");
+#endif
         // Import initital playtree into GUI.
         guiPlaylistInitialize(mpctx->playtree, mconfig, enqueue);
     }
@@ -2966,8 +3110,12 @@ int main(int argc, char *argv[])
 #endif
     if (rtc_fd < 0)
 #endif /* HAVE_RTC */
+#ifdef __MORPHOS__
+	mp_msg(MSGT_CPLAYER, MSGL_V, "Using timer.device timing\n");
+#else
     mp_msg(MSGT_CPLAYER, MSGL_V, "Using %s timing\n",
            softsleep ? "software" : timer_name);
+#endif
 
 #ifdef HAVE_TERMCAP
     if (!use_gui)
@@ -3011,7 +3159,7 @@ int main(int argc, char *argv[])
     current_module     = NULL;
 
     // Catch signals
-#ifndef __MINGW32__
+#if !defined (__MINGW32__) && !defined (__MORPHOS__)
     signal(SIGCHLD, child_sighandler);
 #endif
 
@@ -3054,10 +3202,11 @@ int main(int argc, char *argv[])
 
 play_next_file:
 
+	GetRelativeTime(); // __MORPHOS__
+
     // init global sub numbers
     mpctx->global_sub_size = 0;
     memset(mpctx->sub_counts, 0, sizeof(mpctx->sub_counts));
-
     profile_config_loaded = load_profile_config(mconfig, filename);
 
     if (video_driver_list)
@@ -3094,6 +3243,8 @@ play_next_file:
             }
         }
         gui(GUI_PREPARE, 0);
+
+		GetRelativeTime(); // __MORPHOS__
     }
 #endif /* CONFIG_GUI */
 
@@ -3105,6 +3256,9 @@ play_next_file:
         while (!(cmd = mp_input_get_cmd(0, 1, 0))) { // wait for command
             if (mpctx->video_out && vo_config_count)
                 mpctx->video_out->check_events();
+#ifdef __MORPHOS__
+			gui_handle_events(); /* AREXX HANDLING */
+#endif
             usec_sleep(20000);
         }
         switch (cmd->id) {
@@ -3184,7 +3338,16 @@ play_next_file:
 //==================== Open VOB-Sub ============================
 
     current_module = "vobsub";
+#ifdef __MORPHOS__
+	    /* Disable requesters */
+	    OldWinPtr = MyProcess->pr_WindowPtr;
+	    MyProcess->pr_WindowPtr = (APTR)-1;
+#endif
     load_vob_subtitle(filename, spudec_ifo, &vo_spudec, add_vob_subtitle);
+#ifdef __MORPHOS__
+    /* Enable requesters */
+    MyProcess->pr_WindowPtr = OldWinPtr;
+#endif
     if (vo_vobsub) {
         initialized_flags |= INITIALIZED_VOBSUB;
         vobsub_set_from_lang(vo_vobsub, dvdsub_lang);
@@ -3314,6 +3477,21 @@ play_next_file:
         mpctx->sub_counts[SUB_SOURCE_DEMUX] = mp_dvdnav_number_of_subs(mpctx->stream);
         current_module = NULL;
     }
+#endif
+
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+  if(use_gui && (mpctx->stream->type==STREAMTYPE_DVD || mpctx->stream->type==STREAMTYPE_DVDNAV))
+  {
+	// Force MPlayer to set audio and subtitles properties
+	char cmdbuffer[64];
+	snprintf(cmdbuffer, sizeof(cmdbuffer), "sub_select %d", dvdsub_id);
+	mp_input_queue_cmd(mp_input_parse_cmd(cmdbuffer));
+	snprintf(cmdbuffer, sizeof(cmdbuffer), "switch_audio %d", audio_id);
+	mp_input_queue_cmd(mp_input_parse_cmd(cmdbuffer));
+	//kprintf("audio_id %d dvdsub_id %d\n", audio_id, dvdsub_id);
+  }
+#endif
 #endif
 
 // CACHE2: initial prefill: 20%  later: 5%  (should be set by -cacheopts)
@@ -3537,6 +3715,12 @@ goto_enable_cache:
         init_vo_spudec(mpctx->stream, mpctx->sh_video, mpctx->d_sub ? mpctx->d_sub->sh : NULL);
     }
 
+#ifdef __MORPHOS__
+	/* Disable requesters */
+	OldWinPtr = MyProcess->pr_WindowPtr;
+	MyProcess->pr_WindowPtr = (APTR)-1;
+#endif
+
     if (1 || mpctx->sh_video) {
         // after reading video params we should load subtitles because
         // we know fps so now we can adjust subtitle time to ~6 seconds AST
@@ -3549,6 +3733,11 @@ goto_enable_cache:
         // set even if we have no subs yet, they may be added later
         initialized_flags |= INITIALIZED_SUBS;
     }
+
+#ifdef __MORPHOS__
+	/* Enable requesters */
+	MyProcess->pr_WindowPtr = OldWinPtr;
+#endif
 
     if (select_subtitle(mpctx) && subdata) {
         switch (stream_dump_type) {
@@ -3656,10 +3845,28 @@ goto_enable_cache:
         }
 
 #ifdef CONFIG_GUI
+/*
+// See if new handling considers audio only stuff too.
+        if (use_gui) {
+            if (mpctx->sh_audio)
+                guiIntfStruct.AudioType = mpctx->sh_audio->channels;
+            else
+                guiIntfStruct.AudioType = 0;
+            if (!mpctx->sh_video && mpctx->sh_audio)
+                guiGetEvent(guiSetAudioOnly, (char *)1);
+            else
+                guiGetEvent(guiSetAudioOnly, (char *)0);
+            guiGetEvent(guiSetFileFormat, (char *)mpctx->demuxer->file_format);
+            if (guiGetEvent(guiSetValues, (char *)mpctx->sh_video))
+                goto goto_next_file;
+            guiGetEvent(guiSetDemuxer, (char *)mpctx->demuxer);
+        }
+*/
         if (use_gui) {
             if (!gui(GUI_SET_VIDEO, mpctx->sh_video))
                 goto goto_next_file;
             gui(GUI_SET_AUDIO, mpctx->sh_audio);
+			gui(GUI_SET_DEMUXER, (void *)mpctx->demuxer); // __MORPHOS__
         }
 #endif
 
@@ -3723,6 +3930,18 @@ goto_enable_cache:
 
 /*========================== PLAY AUDIO ============================*/
 
+#ifdef __MORPHOS__
+		    if (SetSignal(0L, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C)
+		    {
+				extern struct Process *cachetask;
+				if(cachetask)
+				{
+					Signal(FindTask(NULL), SIGBREAKF_CTRL_E);
+				}
+				mpctx->eof = PT_NEXT_ENTRY;
+				goto goto_next_file;
+			}
+#endif
             if (mpctx->sh_audio)
                 if (!fill_audio_out_buffers())
                     // at eof, all audio at least written to ao
@@ -3739,6 +3958,10 @@ goto_enable_cache:
 
                 if (!quiet)
                     print_status(a_pos, 0, 0);
+
+#ifdef __MORPHOS__
+				gui_handle_events(); /* AREXX HANDLING */
+#endif
 
                 if (is_at_end(mpctx, &end_at, a_pos))
                     mpctx->eof = PT_NEXT_ENTRY;
@@ -3889,6 +4112,9 @@ goto_enable_cache:
             }
 #endif
 
+#ifdef __AROS__
+  gui_handle_events(); /* AREXX HANDLING */
+#endif
 //============================ Handle PAUSE ===============================
 
             current_module = "pause";
@@ -3988,6 +4214,11 @@ goto_enable_cache:
                     dvd_priv_t *dvdp = mpctx->stream->priv;
                     guiInfo.Chapter = dvd_chapter_from_cell(dvdp, guiInfo.Track - 1, dvdp->cur_cell) + 1;
                 }
+#ifdef __MORPHOS__
+				if (mpctx->stream->type == STREAMTYPE_DVDNAV) {
+					guiInfo.Chapter = demuxer_get_current_chapter(mpctx->demuxer);
+				}
+#endif
 #endif
             }
 #endif /* CONFIG_GUI */
@@ -4080,13 +4311,13 @@ goto_next_file:  // don't jump here after ao/vo/getch initialization!
 
 #ifdef CONFIG_GUI
     if (use_gui)
-        if (guiInfo.NewPlay != GUI_FILE_SAME)
+		if (guiInfo.NewPlay != GUI_FILE_SAME)
             gui(GUI_END_FILE, 0);
 #endif
 
     if (
 #ifdef CONFIG_GUI
-        (use_gui && guiInfo.Playing) ||
+		(use_gui /*&& guiInfo.Playing*/) ||
 #endif
                                         mpctx->playtree_iter != NULL || player_idle_mode) {
         if (!mpctx->playtree_iter && !use_gui)
@@ -4098,5 +4329,4 @@ goto_next_file:  // don't jump here after ao/vo/getch initialization!
     exit_player_with_rc(EXIT_EOF, 0);
     return 1;
 }
-
 #endif /* DISABLE_MAIN */

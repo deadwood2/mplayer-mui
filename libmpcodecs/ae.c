@@ -36,6 +36,7 @@
 #include "ae_twolame.h"
 #include "ae.h"
 
+#undef bind
 
 audio_encoder_t *new_audio_encoder(muxer_stream_t *stream, audio_encoding_params_t *params)
 {

@@ -55,7 +55,13 @@ static inline int _private_gettimeofday( struct timeval *tv, void *tz )
 
 #else
 
-#include <pthread.h>
+#ifdef __MORPHOS__
+typedef int pthread_mutex_t;
+#define pthread_mutex_init(a, b)
+#define pthread_mutex_lock(a)
+#define pthread_mutex_unlock(a)
+#define pthread_mutex_destroy(a)
+#endif
 
 #endif /* WIN32 */
 

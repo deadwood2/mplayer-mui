@@ -47,6 +47,10 @@
 #include "stream/freesdp/parser.h"
 #include "libavutil/avstring.h"
 
+#ifdef __AROS__
+#include <proto/socket.h>
+#endif
+
 #define RTSP_DEFAULT_PORT 31336
 #define MAX_LENGTH 256
 
@@ -127,9 +131,9 @@ rtp_session_free (struct rtp_rtsp_session_t *st)
     return;
 
   if (st->rtp_socket != -1)
-    close (st->rtp_socket);
+	closesocket (st->rtp_socket);
   if (st->rtcp_socket != -1)
-    close (st->rtcp_socket);
+    closesocket (st->rtcp_socket);
 
   free (st->control_url);
   free (st);
@@ -241,7 +245,7 @@ rtcp_connect (int client_port, int server_port, const char* server_hostname)
   hp = gethostbyname (server_hostname);
   if (!hp)
   {
-    close (s);
+	closesocket	(s);
     return -1;
   }
 
@@ -258,7 +262,7 @@ rtcp_connect (int client_port, int server_port, const char* server_hostname)
     if (WSAGetLastError() != WSAEINPROGRESS)
 #endif
     {
-      close (s);
+	  closesocket (s);
       return -1;
     }
   }
@@ -270,7 +274,7 @@ rtcp_connect (int client_port, int server_port, const char* server_hostname)
   /* datagram socket */
   if (connect (s, (struct sockaddr *) &sin, sizeof (sin)) < 0)
   {
-    close (s);
+	closesocket	(s);
     return -1;
   }
 
@@ -300,7 +304,17 @@ rtp_connect (char *hostname, int port)
     sin.sin_addr.s_addr = htonl (INADDR_ANY);
   else
 #if HAVE_INET_PTON
-    inet_pton (AF_INET, hostname, &sin.sin_addr);
+#ifdef __MORPHOS__
+	{
+		long addr = inet_addr(hostname);
+		if (addr != INADDR_NONE)
+		{
+			memcpy(&sin.sin_addr, &addr, sizeof(addr));
+		}
+	}
+#else // __MORPHOS__
+	inet_pton (AF_INET, hostname, &sin.sin_addr);
+#endif // __MORPHOS__
 #elif HAVE_INET_ATON
     inet_aton (hostname, &sin.sin_addr);
 #elif HAVE_WINSOCK2_H
@@ -317,14 +331,18 @@ rtp_connect (char *hostname, int port)
   /* if multicast address, add membership */
   if ((ntohl (sin.sin_addr.s_addr) >> 28) == 0xe)
   {
+#ifdef __AROS__ /* AROS:CHANGED */
+    if(1)
+#else
     struct ip_mreq mcast;
     mcast.imr_multiaddr.s_addr = sin.sin_addr.s_addr;
     mcast.imr_interface.s_addr = 0;
 
     if (setsockopt (s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mcast, sizeof (mcast)))
+#endif
     {
       mp_msg (MSGT_OPEN, MSGL_ERR, "IP_ADD_MEMBERSHIP failed\n");
-      close (s);
+	  closesocket (s);
       return -1;
     }
   }
@@ -339,7 +357,7 @@ rtp_connect (char *hostname, int port)
 #endif
     {
       mp_msg (MSGT_OPEN, MSGL_ERR, "bind: %s\n", strerror (errno));
-      close (s);
+	  closesocket (s);
       return -1;
     }
   }
@@ -354,13 +372,13 @@ rtp_connect (char *hostname, int port)
   if (err < 0)
   {
     mp_msg (MSGT_OPEN, MSGL_ERR, "Select failed: %s\n", strerror (errno));
-    close (s);
+	closesocket	(s);
     return -1;
   }
   else if (err == 0)
   {
     mp_msg (MSGT_OPEN, MSGL_ERR, "Timeout! No data from host %s\n", hostname);
-    close (s);
+	closesocket	(s);
     return -1;
   }
 
@@ -369,7 +387,7 @@ rtp_connect (char *hostname, int port)
   if (err)
   {
     mp_msg (MSGT_OPEN, MSGL_ERR, "Socket error: %d\n", err);
-    close (s);
+	closesocket	(s);
     return -1;
   }
 
@@ -387,11 +405,19 @@ is_multicast_address (char *addr)
   sin.sin_family = AF_INET;
 
 #if HAVE_INET_PTON
-    inet_pton (AF_INET, addr, &sin.sin_addr);
+	 inet_pton (AF_INET, addr, &sin.sin_addr);
 #elif HAVE_INET_ATON
     inet_aton (addr, &sin.sin_addr);
 #elif HAVE_WINSOCK2_H
     sin.sin_addr.s_addr = htonl (INADDR_ANY);
+#elif defined(__MORPHOS__)
+	{
+		long addr2 = inet_addr(addr);
+		if (addr2 != INADDR_NONE)
+		{
+			memcpy(&sin.sin_addr, &addr2, sizeof(addr2));
+		}
+	}
 #endif
 
   if ((ntohl (sin.sin_addr.s_addr) >> 28) == 0xe)

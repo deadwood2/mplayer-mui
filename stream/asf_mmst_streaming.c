@@ -174,7 +174,7 @@ static void get_answer (int s)
   while (command == 0x1b) {
     int len;
 
-    len = recv (s, data, BUF_SIZE, 0) ;
+	len = recv (s, data, BUF_SIZE, 0) ;
     if (!len) {
       mp_msg(MSGT_NETWORK,MSGL_ERR,MSGTR_MPDEMUX_MMST_EOFAlert);
       return;
@@ -194,7 +194,7 @@ static int get_data (int s, char *buf, size_t count)
 
   while (total < count) {
 
-    len = recv (s, &buf[total], count-total, 0);
+	len = recv (s, &buf[total], count-total, 0);
 
     if (len<=0) {
       perror ("read error:");
@@ -505,7 +505,7 @@ static int asf_mmst_streaming_read( int fd, char *buffer, int size, streaming_ct
 
 }
 
-static int asf_mmst_streaming_seek( int fd, off_t pos, streaming_ctrl_t *streaming_ctrl )
+static int asf_mmst_streaming_seek( int fd, quad_t pos, streaming_ctrl_t *streaming_ctrl )
 {
 	return -1;
 	// Shut up gcc warning

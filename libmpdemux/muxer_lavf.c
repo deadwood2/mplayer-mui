@@ -89,14 +89,14 @@ static int64_t mp_seek(void *opaque, int64_t pos, int whence)
 	muxer_t *muxer = opaque;
 	if(whence == SEEK_CUR)
 	{
-		off_t cur = stream_tell(muxer->stream);
+		quad_t cur = stream_tell(muxer->stream);
 		if(cur == -1)
 			return -1;
 		pos += cur;
 	}
 	else if(whence == SEEK_END)
 	{
-		off_t size=0;
+		quad_t size=0;
 		if(stream_control(muxer->stream, STREAM_CTRL_GET_SIZE, &size) == STREAM_UNSUPPORTED || size < pos)
 			return -1;
 		pos = size - pos;

@@ -20,9 +20,21 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#ifdef __MORPHOS__
+#include <proto/socket.h>
+#include <proto/exec.h>
+#include <exec/types.h>
+
+#if !defined(__AROS__)
+#include <sys/filio.h>
+#endif
+
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <errno.h>
 #include <ctype.h>
@@ -95,6 +107,9 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 #if HAVE_WINSOCK2_H
 	unsigned long val;
 	int to;
+#elif __MORPHOS__
+	char val;
+	struct timeval to;
 #else
 	struct timeval to;
 #endif
@@ -144,7 +159,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 	if (inet_pton(af, host, our_s_addr)!=1)
 #elif HAVE_INET_ATON
 	if (inet_aton(host, our_s_addr)!=1)
-#elif HAVE_WINSOCK2_H
+#elif HAVE_WINSOCK2_H || defined(__MORPHOS__)
 	if ( inet_addr(host)==INADDR_NONE )
 #endif
 	{
@@ -162,7 +177,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 		memcpy( our_s_addr, (void*)hp->h_addr_list[0], hp->h_length );
 	}
-#if HAVE_WINSOCK2_H
+#if defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__)
 	else {
 		unsigned long addr = inet_addr(host);
 		memcpy( our_s_addr, (void*)&addr, sizeof(addr) );
@@ -189,14 +204,23 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 #if HAVE_INET_PTON
 	inet_ntop(af, our_s_addr, buf, 255);
-#elif HAVE_INET_ATON || defined(HAVE_WINSOCK2_H)
+#elif HAVE_INET_ATON || defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__)
 	av_strlcpy( buf, inet_ntoa( *((struct in_addr*)our_s_addr) ), 255);
 #endif
 	if(verb) mp_msg(MSGT_NETWORK,MSGL_STATUS,MSGTR_MPDEMUX_NW_ConnectingToServer, host, buf , port );
 
+
+#if 0
+
 	// Turn the socket as non blocking so we can timeout on the connection
 #if !HAVE_WINSOCK2_H
+#ifdef __MORPHOS__
+	val = 1;
+	IoctlSocket( socket_server_fd, FIONBIO, &val );
+	errno=EINPROGRESS;
+#else // __MORPHOS__
 	fcntl( socket_server_fd, F_SETFL, fcntl(socket_server_fd, F_GETFL) | O_NONBLOCK );
+#endif // __MORPHOS__
 #else
 	val = 1;
 	ioctlsocket( socket_server_fd, FIONBIO, &val );
@@ -235,11 +259,18 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 	// Turn back the socket as blocking
 #if !HAVE_WINSOCK2_H
+#ifdef __MORPHOS__
+	errno=0;
+	val = 0;
+	IoctlSocket( socket_server_fd, FIONBIO, &val );
+#else // __MORPHOS__
 	fcntl( socket_server_fd, F_SETFL, fcntl(socket_server_fd, F_GETFL) & ~O_NONBLOCK );
+#endif // __MORPHOS__
 #else
 	val = 0;
 	ioctlsocket( socket_server_fd, FIONBIO, &val );
 #endif
+
 	// Check if there were any errors
 	err_len = sizeof(int);
 	ret =  getsockopt(socket_server_fd,SOL_SOCKET,SO_ERROR,&err,&err_len);
@@ -251,6 +282,16 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 		mp_msg(MSGT_NETWORK,MSGL_ERR,MSGTR_MPDEMUX_NW_ConnectError,strerror(err));
 		return TCP_ERROR_PORT;
 	}
+
+#else
+	if( connect( socket_server_fd, (struct sockaddr*)&server_address, server_address_size )==-1 ) {
+		if( errno!=EINPROGRESS ) {
+			if(verb) mp_msg(MSGT_NETWORK,MSGL_ERR,MSGTR_MPDEMUX_NW_CantConnect2Server, af2String(af));
+			closesocket(socket_server_fd);
+			return TCP_ERROR_PORT;
+		}
+	}
+#endif
 
 	return socket_server_fd;
 }
@@ -278,3 +319,4 @@ connect2Server(char *host, int  port, int verb) {
 
 
 }
+

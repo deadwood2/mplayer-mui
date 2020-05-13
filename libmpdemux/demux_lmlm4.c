@@ -100,7 +100,7 @@ int searchMPEG4Stream(demuxer_t* demuxer, IME6400Header *imeHeader)
     ssize_t dataSize = sizeof(IME6400Header) * 3;
     ssize_t ptr = imeHeaderSize * 2;
     int errNo, startCodeNo;
-    off_t pos;
+    quad_t pos;
 
     data = malloc(dataSize);
 

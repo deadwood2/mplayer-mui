@@ -25,7 +25,10 @@
 extern m_config_t *gui_conf;
 
 extern int gtkCacheOn;
-extern int gtkCacheSize;
+//extern int gtkCacheSize;
+extern int    gtkCacheSizeDVD;
+extern int    gtkCacheSizeNet;
+extern int    gtkCacheSizeFile;
 
 extern int gtkVfPP;
 extern int gtkVfLAVC;
@@ -48,6 +51,19 @@ extern char *gtkAOOSSMixer;
 extern char *gtkAOOSSMixerChannel;
 extern char *gtkAOOSSDevice;
 
+#ifdef __MORPHOS__
+extern int    gui_window_dimensions;
+extern int    gui_show_gui;
+extern int    gui_show_status;
+extern int    gui_show_toolbar;
+extern int    gui_use_dvdnav;
+extern int    gui_show_control;
+extern int    gui_black_status;
+extern int    gui_repeat_mode;
+extern int    remember_path;
+extern int    remember_playlist;
+#endif
+
 extern char *gtkAOESDDevice;
 
 extern char *gtkAOSDLDriver;
@@ -64,6 +80,7 @@ extern float gtkEquChannels[6][10];
 extern int gtkSubDumpMPSub;
 extern int gtkSubDumpSrt;
 
+#ifdef CONFIG_ASS
 typedef struct {
     int enabled;
     int use_margins;
@@ -72,6 +89,7 @@ typedef struct {
 } gtkASS_t;
 
 extern gtkASS_t gtkASS;
+#endif
 
 extern int gtkEnablePlayBar;
 extern int gtkLoadFullscreen;

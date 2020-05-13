@@ -122,7 +122,7 @@ typedef struct demux_packet {
   double pts;
   double endpts;
   double stream_pts;
-  off_t pos;  // position in index (AVI) or file (MPG)
+  quad_t pos;  // position in index (AVI) or file (MPG)
   unsigned char* buffer;
   int flags; // keyframe, etc
   int refcount;   //refcounter for the master packet, if 0, buffer can be free()d
@@ -137,8 +137,8 @@ typedef struct {
   double pts;              // current buffer's pts
   int pts_bytes;           // number of bytes read after last pts stamp
   int eof;                 // end of demuxed stream? (true if all buffer empty)
-  off_t pos;                 // position in the input stream (file)
-  off_t dpos;                // position in the demuxed stream
+  quad_t pos;                 // position in the input stream (file)
+  quad_t dpos;                // position in the demuxed stream
   int pack_no;		   // serial number of packet
   int flags;               // flags of current packet (keyframe etc)
   int non_interleaved;     // 1 if this stream is not properly interleaved,
@@ -239,9 +239,9 @@ typedef struct demux_attachment
 
 typedef struct demuxer {
   const demuxer_desc_t *desc;  ///< Demuxer description structure
-  off_t filepos; // input stream current pos.
-  off_t movi_start;
-  off_t movi_end;
+  quad_t filepos; // input stream current pos.
+  quad_t movi_start;
+  quad_t movi_end;
   stream_t *stream;
   double stream_pts;       // current stream pts, if applicable (e.g. dvd)
   double reference_clock;
@@ -364,12 +364,12 @@ void free_demuxer_stream(demux_stream_t *ds);
 void free_demuxer(demuxer_t *demuxer);
 
 void ds_add_packet(demux_stream_t *ds,demux_packet_t* dp);
-void ds_read_packet(demux_stream_t *ds, stream_t *stream, int len, double pts, off_t pos, int flags);
+void ds_read_packet(demux_stream_t *ds, stream_t *stream, int len, double pts, quad_t pos, int flags);
 
 int demux_fill_buffer(demuxer_t *demux,demux_stream_t *ds);
 int ds_fill_buffer(demux_stream_t *ds);
 
-static inline off_t ds_tell(demux_stream_t *ds){
+static inline quad_t ds_tell(demux_stream_t *ds){
   return (ds->dpos-ds->buffer_size)+ds->buffer_pos;
 }
 
@@ -407,7 +407,7 @@ int ds_get_packet_pts(demux_stream_t *ds, unsigned char **start, double *pts);
 int ds_get_packet_sub(demux_stream_t *ds,unsigned char **start,
                       double *pts, double *endpts);
 double ds_get_next_pts(demux_stream_t *ds);
-int ds_parse(demux_stream_t *sh, uint8_t **buffer, int *len, double pts, off_t pos);
+int ds_parse(demux_stream_t *sh, uint8_t **buffer, int *len, double pts, quad_t pos);
 void ds_clear_parser(demux_stream_t *sh);
 
 // This is defined here because demux_stream_t isn't defined in stream.h

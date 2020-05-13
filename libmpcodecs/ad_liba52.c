@@ -54,6 +54,7 @@ static uint32_t channel_map;
 #define DRC_CALLBACK       2
 
 /** The output is multiplied by this var.  Used for volume control */
+float a52_volume = 0.0;
 static sample_t a52_level = 1;
 static int a52_drc_action = DRC_NO_ACTION;
 
@@ -147,7 +148,9 @@ static int preinit(sh_audio_t *sh)
   if (sh->samplesize < 4) sh->samplesize = 4;
   sh->audio_out_minsize=audio_output_channels*sh->samplesize*256*6;
   sh->audio_in_minsize=3840;
-  a52_level = 1.0;
+//__MORPHOS__
+  //a52_level = 1.0;
+  a52_level = pow(10.0,a52_volume/20.0);  /*1.0;*/
   return 1;
 }
 

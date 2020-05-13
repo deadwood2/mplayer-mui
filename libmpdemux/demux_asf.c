@@ -407,7 +407,11 @@ static int demux_asf_fill_buffer(demuxer_t *demux, demux_stream_t *ds){
 	    if(((flags>>5)&3)!=0){
               // Explicit (absoulte) packet size
               mp_dbg(MSGT_DEMUX,MSGL_DBG2,"Explicit packet size specified: %d  \n",plen);
-              if(plen>asf->packetsize) mp_msg(MSGT_DEMUX,MSGL_V,"Warning! plen>packetsize! (%d>%d)  \n",plen,asf->packetsize);
+			  if(plen>asf->packetsize)
+			  {
+				 mp_msg(MSGT_DEMUX,MSGL_V,"Warning! plen>packetsize! (%d>%d)  \n",plen,asf->packetsize);
+				 return 1;
+			  }
 	    } else {
               // Padding (relative) size
               plen=asf->packetsize-padding;
@@ -557,16 +561,16 @@ static void demux_seek_asf(demuxer_t *demuxer,float rel_seek_secs,float audio_de
     sh_audio_t *sh_audio=d_audio->sh;
 //    sh_video_t *sh_video=d_video->sh;
 
-  //FIXME: OFF_T - didn't test ASF case yet (don't have a large asf...)
+  //FIXME: quad_t - didn't test ASF case yet (don't have a large asf...)
   //FIXME: reports good or bad to steve@daviesfam.org please
 
   //================= seek in ASF ==========================
     float p_rate=asf->packetrate; // packets / sec
-    off_t rel_seek_packs=(flags&SEEK_FACTOR)?	 // FIXME: int may be enough?
+    quad_t rel_seek_packs=(flags&SEEK_FACTOR)?	  // FIXME: int may be enough?
 	(rel_seek_secs*(demuxer->movi_end-demuxer->movi_start)/asf->packetsize):
 	(rel_seek_secs*p_rate);
-    off_t rel_seek_bytes=rel_seek_packs*asf->packetsize;
-    off_t newpos;
+    quad_t rel_seek_bytes=rel_seek_packs*asf->packetsize;
+    quad_t newpos;
     //printf("ASF: packs: %d  duration: %d  \n",(int)fileh.packets,*((int*)&fileh.duration));
 //    printf("ASF_seek: %d secs -> %d packs -> %d bytes  \n",
 //       rel_seek_secs,rel_seek_packs,rel_seek_bytes);

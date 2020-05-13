@@ -20,6 +20,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include "config.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h> /* For the timing of dvdcss_title crack. */
@@ -52,7 +54,7 @@ static inline int _private_gettimeofday( struct timeval *tv, void *tz )
 #define lseek64 _lseeki64
 #endif
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__bsdi__) || defined(__APPLE__)
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__bsdi__) || defined(__DARWIN__)
 #define SYS_BSD 1
 #endif
 
@@ -63,6 +65,10 @@ static inline int _private_gettimeofday( struct timeval *tv, void *tz )
 #elif defined(__linux__)
 #include <mntent.h>
 #include <paths.h>
+#endif
+
+#ifdef __MORPHOS__
+#define fchdir chdir
 #endif
 
 #include "dvdread/dvd_udf.h"
@@ -333,6 +339,12 @@ static char *bsd_block2char( const char *path )
 }
 #endif
 
+#ifdef __MORPHOS__
+#include <dos/dos.h>
+#include <proto/dos.h>
+#include <proto/exec.h>
+extern void dvdinput_setup_file_access(void);
+#endif
 
 dvd_reader_t *DVDOpen( const char *ppath )
 {
@@ -340,18 +352,18 @@ dvd_reader_t *DVDOpen( const char *ppath )
   int ret, have_css, retval, cdir = -1;
   dvd_reader_t *ret_val = NULL;
   char *dev_name = NULL;
-  char *path = NULL, *new_path = NULL, *path_copy = NULL;
+  char *path;
 
 #if defined(_WIN32) || defined(__OS2__)
       int len;
 #endif
 
   if( ppath == NULL )
-    goto DVDOpen_error;
+    return 0;
 
       path = strdup(ppath);
   if( path == NULL )
-    goto DVDOpen_error;
+    return 0;
 
   /* Try to open libdvdcss or fall back to standard functions */
   have_css = dvdinput_setup();
@@ -367,6 +379,7 @@ dvd_reader_t *DVDOpen( const char *ppath )
   }
 #endif
 
+#ifndef __MORPHOS__
   ret = stat( path, &fileinfo );
 
   if( ret < 0 ) {
@@ -381,8 +394,32 @@ dvd_reader_t *DVDOpen( const char *ppath )
     /* If we can't stat the file, give up */
     fprintf( stderr, "libdvdread: Can't stat %s\n", path );
     perror("");
-    goto DVDOpen_error;
+    free(path);
+    return NULL;
   }
+#else
+	{
+		BPTR l;
+		APTR OldWinPtr;
+		struct Process *MyProcess;
+		MyProcess = (struct Process *)FindTask(NULL);
+
+	    OldWinPtr = MyProcess->pr_WindowPtr;
+	    MyProcess->pr_WindowPtr = (APTR)-1;
+
+		if((l = Lock(path, ACCESS_READ)))
+		{
+			fileinfo.st_mode = S_IFDIR;
+			UnLock(l);
+		}
+		else
+		{
+			fileinfo.st_mode = S_IFBLK;
+		}
+
+	  	MyProcess->pr_WindowPtr = OldWinPtr;
+	}
+#endif
 
   /* First check if this is a block/char device or a file*/
   if( S_ISBLK( fileinfo.st_mode ) ||
@@ -406,6 +443,7 @@ dvd_reader_t *DVDOpen( const char *ppath )
     return dvd;
   } else if( S_ISDIR( fileinfo.st_mode ) ) {
     dvd_reader_t *auth_drive = 0;
+    char *path_copy;
 #if defined(SYS_BSD)
     struct fstab* fe;
 #elif defined(__sun) || defined(__linux__)
@@ -413,33 +451,31 @@ dvd_reader_t *DVDOpen( const char *ppath )
 #endif
 
     /* XXX: We should scream real loud here. */
-    if( !(path_copy = strdup( path ) ) )
-      goto DVDOpen_error;
+    if( !(path_copy = strdup( path ) ) ) {
+      free(path);
+      return NULL;
+    }
 
-#ifndef WIN32 /* don't have fchdir, and getcwd( NULL, ... ) is strange */
+#if !defined(WIN32) && !defined(__MORPHOS__) /* don't have fchdir, and getcwd( NULL, ... ) is strange */
               /* Also WIN32 does not have symlinks, so we don't need this bit of code. */
 
     /* Resolve any symlinks and get the absolute dir name. */
     {
-      if( ( cdir  = open( ".", O_RDONLY ) ) >= 0 ) {
-        if( chdir( path_copy ) == -1 ) {
-          goto DVDOpen_error;
-        }
+      char *new_path;
+      int cdir = open( ".", O_RDONLY );
+
+      if( cdir >= 0 ) {
+        chdir( path_copy );
         new_path = malloc(PATH_MAX+1);
         if(!new_path) {
-          goto DVDOpen_error;
+          free(path);
+          return NULL;
         }
-        if( getcwd( new_path, PATH_MAX ) == NULL ) {
-          goto DVDOpen_error;
-        }
-        retval = fchdir( cdir );
+        getcwd(new_path, PATH_MAX );
+        fchdir( cdir );
         close( cdir );
-        cdir = -1;
-        if( retval == -1 ) {
-          goto DVDOpen_error;
-        }
-        path_copy = new_path;
-        new_path = NULL;
+          free( path_copy );
+          path_copy = new_path;
       }
     }
 #endif
@@ -548,9 +584,7 @@ dvd_reader_t *DVDOpen( const char *ppath )
 #endif
 
     free( dev_name );
-    dev_name = NULL;
     free( path_copy );
-    path_copy = NULL;
 
     /**
      * If we've opened a drive, just use that.
@@ -562,22 +596,16 @@ dvd_reader_t *DVDOpen( const char *ppath )
     /**
      * Otherwise, we now try to open the directory tree instead.
      */
+	
+	dvdinput_setup_file_access();
     ret_val = DVDOpenPath( path );
       free( path );
       return ret_val;
   }
 
-DVDOpen_error:
   /* If it's none of the above, screw it. */
   fprintf( stderr, "libdvdread: Could not open %s\n", path );
-  if( path != NULL )
     free( path );
-  if ( path_copy != NULL )
-    free( path_copy );
-  if ( cdir >= 0 )
-    close( cdir );
-  if ( new_path != NULL )
-    free( new_path );
   return NULL;
 }
 
@@ -637,7 +665,7 @@ static int findDirFile( const char *path, const char *file, char *filename )
   while( ( ent = readdir( dir ) ) != NULL ) {
     if( !strcasecmp( ent->d_name, file ) ) {
       sprintf( filename, "%s%s%s", path,
-               ( ( path[ strlen( path ) - 1 ] == '/' ) ? "" : "/" ),
+			   ( ( path[ strlen( path ) - 1 ] == '/' || path[ strlen( path ) - 1 ] == ':'  ) ? "" : "/" ),
                ent->d_name );
       closedir(dir);
       return 0;
@@ -662,17 +690,19 @@ static int findDVDFile( dvd_reader_t *dvd, const char *file, char *filename )
 
   ret = findDirFile( dvd->path_root, nodirfile, filename );
   if( ret < 0 ) {
-    /* Try also with adding the path, just in case. */
-    sprintf( video_path, "%s/VIDEO_TS/", dvd->path_root );
-    ret = findDirFile( video_path, nodirfile, filename );
-    if( ret < 0 ) {
-      /* Try with the path, but in lower case. */
-      sprintf( video_path, "%s/video_ts/", dvd->path_root );
-      ret = findDirFile( video_path, nodirfile, filename );
-      if( ret < 0 ) {
-        return 0;
-      }
-    }
+        /* Try also with adding the path, just in case. */
+		sprintf( video_path, "%s%sVIDEO_TS/", dvd->path_root,
+		( dvd->path_root[ strlen( dvd->path_root ) - 1 ] == '/' || dvd->path_root[ strlen( dvd->path_root ) - 1 ] == ':'  ) ? "" : "/"  ); // _MORPHOS__
+        ret = findDirFile( video_path, nodirfile, filename );
+        if( ret < 0 ) {
+            /* Try with the path, but in lower case. */
+			sprintf( video_path, "%s%svideo_ts/", dvd->path_root,
+            ( dvd->path_root[ strlen( dvd->path_root ) - 1 ] == '/' || dvd->path_root[ strlen( dvd->path_root ) - 1 ] == ':'  ) ? "" : "/"  ); // __MORPHOS__
+            ret = findDirFile( video_path, nodirfile, filename );
+            if( ret < 0 ) {
+                return 0;
+            }
+        }
   }
 
   return 1;

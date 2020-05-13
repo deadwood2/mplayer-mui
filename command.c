@@ -72,6 +72,10 @@
 #include "libavutil/avstring.h"
 #include "edl.h"
 
+#ifdef __MORPHOS__
+#include <proto/dos.h>
+#endif
+
 static void rescale_input_coordinates(int ix, int iy, double *dx, double *dy)
 {
     //remove the borders, if any, and rescale to the range [0,1],[0,1]
@@ -138,7 +142,7 @@ static int sub_source_pos(MPContext *mpctx)
     return pos;
 }
 
-static int sub_source(MPContext *mpctx)
+/*static*/ int sub_source(MPContext *mpctx) // __MORPHOS__
 {
     return sub_source_by_pos(mpctx, mpctx->global_sub_pos);
 }
@@ -310,11 +314,11 @@ static int mp_property_stream_pos(m_option_t *prop, int action, void *arg,
         return M_PROPERTY_ERROR;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg = stream_tell(mpctx->demuxer->stream);
+		*(quad_t *) arg = stream_tell(mpctx->demuxer->stream);
         return M_PROPERTY_OK;
     case M_PROPERTY_SET:
-        M_PROPERTY_CLAMP(prop, *(off_t *) arg);
-        stream_seek(mpctx->demuxer->stream, *(off_t *) arg);
+		M_PROPERTY_CLAMP(prop, *(quad_t *) arg);
+		stream_seek(mpctx->demuxer->stream, *(quad_t *) arg);
         return M_PROPERTY_OK;
     }
     return M_PROPERTY_NOT_IMPLEMENTED;
@@ -328,7 +332,7 @@ static int mp_property_stream_start(m_option_t *prop, int action,
         return M_PROPERTY_UNAVAILABLE;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg = mpctx->demuxer->stream->start_pos;
+		*(quad_t *) arg = mpctx->demuxer->stream->start_pos;
         return M_PROPERTY_OK;
     }
     return M_PROPERTY_NOT_IMPLEMENTED;
@@ -342,7 +346,7 @@ static int mp_property_stream_end(m_option_t *prop, int action, void *arg,
         return M_PROPERTY_UNAVAILABLE;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg = mpctx->demuxer->stream->end_pos;
+		*(quad_t *) arg = mpctx->demuxer->stream->end_pos;
         return M_PROPERTY_OK;
     }
     return M_PROPERTY_NOT_IMPLEMENTED;
@@ -356,7 +360,7 @@ static int mp_property_stream_length(m_option_t *prop, int action,
         return M_PROPERTY_UNAVAILABLE;
     switch (action) {
     case M_PROPERTY_GET:
-        *(off_t *) arg =
+		*(quad_t *) arg =
             mpctx->demuxer->stream->end_pos - mpctx->demuxer->stream->start_pos;
         return M_PROPERTY_OK;
     }
@@ -939,6 +943,12 @@ static int mp_property_audio(m_option_t *prop, int action, void *arg,
                 reinit_audio_chain();
             }
         }
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+		if (use_gui)
+			gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATEAUDIO);
+#endif
+#endif
         mp_msg(MSGT_IDENTIFY, MSGL_INFO, "ID_AUDIO_TRACK=%d\n", audio_id);
         return M_PROPERTY_OK;
     default:
@@ -1068,7 +1078,13 @@ static int mp_property_fullscreen(m_option_t *prop, int action, void *arg,
         else
 #endif
         if (vo_config_count)
-            mpctx->video_out->control(VOCTRL_FULLSCREEN, 0);
+		// __MORPHOS__
+		{
+			if(mpctx->video_out->control(VOCTRL_FULLSCREEN, 0) == VO_FALSE)
+			{
+				exit_player_with_rc(EXIT_ERROR, 0);
+			}
+		}
         return M_PROPERTY_OK;
     default:
         return m_property_flag(prop, action, arg, &vo_fs);
@@ -1519,7 +1535,7 @@ static int mp_property_sub(m_option_t *prop, int action, void *arg,
         source_pos = sub_source_pos(mpctx);
     }
 
-    mp_msg(MSGT_CPLAYER, MSGL_DBG3,
+	mp_msg(MSGT_CPLAYER, MSGL_DBG3,
            "subtitles: %d subs, (v@%d s@%d d@%d), @%d, source @%d\n",
            global_sub_size,
            mpctx->sub_counts[SUB_SOURCE_VOBSUB],
@@ -1598,6 +1614,13 @@ static int mp_property_sub(m_option_t *prop, int action, void *arg,
     if (mpctx->sh_video)
         pts = mpctx->sh_video->pts;
     update_subtitles(mpctx->sh_video, pts, d_sub, 1);
+
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+	if (use_gui)
+		gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATESUBTITLE);
+#endif
+#endif
 
     return M_PROPERTY_OK;
 }
@@ -2165,7 +2188,7 @@ static const m_option_t mp_properties[] = {
     { "fps", mp_property_fps, CONF_TYPE_FLOAT,
      0, 0, 0, NULL },
     { "aspect", mp_property_aspect, CONF_TYPE_FLOAT,
-     0, 0, 0, NULL },
+	 0, 0, 0, NULL },
     { "switch_video", mp_property_video, CONF_TYPE_INT,
      CONF_RANGE, -2, 65535, NULL },
     { "switch_program", mp_property_program, CONF_TYPE_INT,
@@ -2871,13 +2894,26 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
             break;
 
         case MP_CMD_LOADFILE:{
-                play_tree_t *e = play_tree_new();
+				play_tree_t *e;
+
+				// __MORPHOS__
+				#ifdef CONFIG_GUI
+				if (use_gui)
+				{
+					gui(GUI_LOAD_FILE, cmd->args[0].v.s);
+					brk_cmd = 1;
+					break; // let's just handle first file
+				}
+				#endif
+                e = play_tree_new();
                 play_tree_add_file(e, cmd->args[0].v.s);
 
                 if (cmd->args[1].v.i)   // append
                     play_tree_append_entry(mpctx->playtree->child, e);
                 else {
-                    // Go back to the starting point.
+                    if(!mpctx->playtree_iter) break; // __MORPHOS__
+					
+					// Go back to the starting point.
                     while (play_tree_iter_up_step
                            (mpctx->playtree_iter, 0, 1) != PLAY_TREE_ITER_END)
                         /* NOP */ ;
@@ -3153,6 +3189,12 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
                     mpctx->sub_counts[SUB_SOURCE_SUBS]++;
                     ++mpctx->global_sub_size;
                 }
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+				if (use_gui)
+					gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATESUBTITLE);
+#endif
+#endif
             }
             break;
 
@@ -3164,6 +3206,12 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
                 } else if (v < mpctx->set_of_sub_size) {
                     remove_subtitle_range(mpctx, v, 1);
                 }
+#ifdef __MORPHOS__
+#ifdef CONFIG_GUI
+				if (use_gui)
+					gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATESUBTITLE);
+#endif
+#endif
             }
             break;
 
@@ -3344,7 +3392,10 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
             break;
 
         case MP_CMD_RUN:
-#ifndef __MINGW32__
+#if defined(__MORPHOS__)
+		mp_msg(MSGT_GLOBAL, MSGL_INFO, "Executing <%s>\n", cmd->args[0].v.s);
+		Execute(cmd->args[0].v.s, NULL, Output());
+#elif  !defined(__MINGW32)
             if (!fork()) {
                 execl("/bin/sh", "sh", "-c", cmd->args[0].v.s, NULL);
                 exit(0);
@@ -3460,7 +3511,12 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
         }
         break;
 
-        default:
+	default:
+#ifdef CONFIG_GUI
+            if ((use_gui) && (cmd->id > MP_CMD_GUI_EVENTS))
+				gui(GUI_RUN_COMMAND, (void *) cmd->id);
+            else
+#endif
 #ifdef CONFIG_GUI
                 if (use_gui && cmd->id == MP_CMD_GUI)
                     gui(GUI_RUN_MESSAGE, cmd->args[0].v.s);

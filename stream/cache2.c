@@ -22,6 +22,10 @@
 // Note it runs in 2 processes (using fork()), but doesn't require locking!!
 // TODO: seeking, data consistency checking
 
+#if CONFIG_STREAM_CACHE
+
+#define DEBUG(x) ;
+
 #define READ_SLEEP_TIME 10
 // These defines are used to reduce the cost of many successive
 // seeks (e.g. when a file has no index) by spinning quickly at first.
@@ -52,6 +56,7 @@ static void ThreadProc( void *s );
 #elif defined(PTHREAD_CACHE)
 #include <pthread.h>
 static void *ThreadProc(void *s);
+#elif defined(__MORPHOS__)
 #else
 #include <sys/wait.h>
 #define FORKED_CACHE 1
@@ -66,6 +71,51 @@ static void *ThreadProc(void *s);
 #include "stream.h"
 #include "cache2.h"
 #include "mp_global.h"
+
+#ifdef __MORPHOS__
+
+#include <errno.h>
+#include <clib/debug_protos.h>
+#include <exec/ports.h>
+#include <exec/tasks.h>
+#include <exec/types.h>
+#include <dos/dostags.h>
+#if !defined(__AROS__)
+#include <amitcp/socketbasetags.h>
+#else
+#include <bsdsocket/socketbasetags.h>
+#endif
+
+#include <proto/exec.h>
+#include <proto/dos.h>
+#include <proto/socket.h>
+
+#include "input/input.h"
+#include "morphos_stuff.h"
+
+#if MPLAYER
+#ifdef CONFIG_GUI
+#include "gui/interface.h"
+#include "gui/morphos/gui.h"
+extern int use_gui;
+extern char * stream_dump_name;
+static FILE * dump_f = NULL;
+#endif
+#endif
+
+extern struct Library * SocketBase;
+extern struct Task * maintask;
+
+struct Library * oldSocketBase;
+struct Process * cachetask;
+static LONG fdkey;
+
+#define CURRENT_TASK (FindTask(NULL) == maintask) ? "[MAIN TASK]" : "[CACHE TASK]"
+
+#endif
+
+int stream_fill_buffer(stream_t *s);
+int stream_seek_long(stream_t *s,quad_t pos);
 
 typedef struct {
   // constats:
@@ -99,6 +149,20 @@ typedef struct {
   volatile double stream_time_pos;
 } cache_vars_t;
 
+#ifdef __MORPHOS__
+
+void force_exit(void)
+{
+	/*
+	if(cachetask)
+	{
+		Signal((struct Task *) cachetask, SIGBREAKF_CTRL_E);
+	}
+	*/
+}
+
+#endif
+
 static void cache_wakeup(stream_t *s)
 {
 #if FORKED_CACHE
@@ -118,12 +182,23 @@ static int cache_read(cache_vars_t *s, unsigned char *buf, int size)
   int total=0;
   int sleep_count = 0;
   int64_t last_max = s->max_filepos;
+
+  DEBUG(kprintf("%s cache_read\n", CURRENT_TASK));
+
   while(size>0){
     int64_t pos,newb,len;
 
   //printf("CACHE2_READ: 0x%X <= 0x%X <= 0x%X  \n",s->min_filepos,s->read_filepos,s->max_filepos);
 
-    if(s->read_filepos>=s->max_filepos || s->read_filepos<s->min_filepos){
+	// In case cache stalls for some reason, let's accept to break it
+	if (SetSignal(0L, SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_E) & (SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_E))
+	{
+		//s->eof = 1;
+		//break;
+		return 0;
+	}
+	
+	if(s->read_filepos>=s->max_filepos || s->read_filepos<s->min_filepos){
 	// eof?
 	if(s->eof) break;
 	if (s->max_filepos == last_max) {
@@ -139,16 +214,16 @@ static int cache_read(cache_vars_t *s, unsigned char *buf, int size)
 	    break;
 	}
 	continue; // try again...
-    }
+	}
     sleep_count = 0;
 
     newb=s->max_filepos-s->read_filepos; // new bytes in the buffer
 
 //    printf("*** newb: %d bytes ***\n",newb);
 
-    pos=s->read_filepos - s->offset;
-    if(pos<0) pos+=s->buffer_size; else
-    if(pos>=s->buffer_size) pos-=s->buffer_size;
+	pos=s->read_filepos - s->offset;
+	if(pos<0) pos+=s->buffer_size; else
+	if(pos>=s->buffer_size) pos-=s->buffer_size;
 
     if(newb>s->buffer_size-pos) newb=s->buffer_size-pos; // handle wrap...
     if(newb>size) newb=size;
@@ -166,8 +241,10 @@ static int cache_read(cache_vars_t *s, unsigned char *buf, int size)
     s->read_filepos+=len;
     size-=len;
     total+=len;
-
   }
+
+  DEBUG(kprintf("%s cache_read total = %d\n", CURRENT_TASK, total));
+
   return total;
 }
 
@@ -177,6 +254,8 @@ static int cache_fill(cache_vars_t *s)
   int64_t read=s->read_filepos;
   int read_chunk;
   int wraparound_copy = 0;
+
+  DEBUG(kprintf("%s cache_fill read = %lld s->min_filepos = %lld s->max_filepos = %lld\n", CURRENT_TASK, read, s->min_filepos, s->max_filepos));
 
   if(read<s->min_filepos || read>s->max_filepos){
       // seek...
@@ -212,7 +291,7 @@ static int cache_fill(cache_vars_t *s)
 
   if(space<s->fill_limit){
 //    printf("Buffer is full (%d bytes free, limit: %d)\n",space,s->fill_limit);
-    return 0; // no fill...
+	return 0; // no fill...
   }
 
 //  printf("### read=0x%X  back=%d  newb=%d  space=%d  pos=%d\n",read,back,newb,space,pos);
@@ -241,6 +320,8 @@ static int cache_fill(cache_vars_t *s)
   s->min_filepos=read-back; // avoid seeking-back to temp area...
 #endif
 
+  DEBUG(kprintf("%s cache_fill before read\n", CURRENT_TASK));
+
   if (wraparound_copy) {
     int to_copy;
     len = stream_read_internal(s->stream, s->stream->buffer, space);
@@ -249,12 +330,28 @@ static int cache_fill(cache_vars_t *s)
     memcpy(s->buffer, s->stream->buffer + to_copy, len - to_copy);
   } else
   len = stream_read_internal(s->stream, &s->buffer[pos], space);
+
+#if MPLAYER
+#ifdef CONFIG_GUI
+  if(use_gui && mygui->dumpstream)
+  {
+	if(dump_f && fwrite(&s->buffer[pos],len,1,dump_f) != 1) {
+		mp_msg(MSGT_CPLAYER,MSGL_STATUS,MSGTR_ErrorWritingFile,stream_dump_name);
+		fclose(dump_f);
+		dump_f = NULL;
+	}
+  }
+#endif
+#endif
+
   s->eof= !len;
 
+  DEBUG(kprintf("%s cache_fill after read, read %d\n", CURRENT_TASK, len));
+  
   s->max_filepos+=len;
   if(pos+len>=s->buffer_size){
-      // wrap...
-      s->offset+=s->buffer_size;
+	  // wrap...
+	  s->offset+=s->buffer_size;
   }
 
   return len;
@@ -353,12 +450,15 @@ static void shared_free(void *ptr, int64_t size) {
 static cache_vars_t* cache_init(int64_t size,int sector){
   int64_t num;
   cache_vars_t* s=shared_alloc(sizeof(cache_vars_t));
+
+  DEBUG(kprintf("%s cache_init(%d %d)\n", CURRENT_TASK, size, sector));
+
   if(s==NULL) return NULL;
 
   memset(s,0,sizeof(cache_vars_t));
   num=size/sector;
   if(num < 16){
-     num = 16;
+	 num = 16;
   }//32kb min_size
   s->buffer_size=num*sector;
   s->sector_size=sector;
@@ -366,23 +466,98 @@ static cache_vars_t* cache_init(int64_t size,int sector){
 
   if(s->buffer == NULL){
     shared_free(s, sizeof(cache_vars_t));
-    return NULL;
+	return NULL;
   }
 
   s->fill_limit=8*sector;
   s->back_size=s->buffer_size/2;
+
+#if MPLAYER
+#ifdef CONFIG_GUI
+  if(use_gui && mygui->dumpstream)
+  {
+	  dump_f = fopen(stream_dump_name,"wb");
+	
+	  if(dump_f)
+	  {
+		mp_msg(MSGT_CPLAYER,MSGL_STATUS,"Dumping current stream to %s\n",stream_dump_name);
+	  }
+  }
+#endif
+#endif
+
 #if FORKED_CACHE
   s->ppid = getpid();
 #endif
   return s;
 }
 
+#if defined(__MORPHOS__)
+extern void gdvdcss_open(void);
+extern void gdvdcss_close(void);
+#endif
+
 void cache_uninit(stream_t *s) {
   cache_vars_t* c = s->cache_data;
   if(s->cache_pid) {
-#if !FORKED_CACHE
+#if !FORKED_CACHE && !defined(__MORPHOS__)
     cache_do_control(s, -2, NULL);
-#else
+#elif defined(__MORPHOS__)
+    // Tell cachetask to quit
+	DEBUG(kprintf("%s Signal end task\n", CURRENT_TASK));
+    Signal((struct Task *) cachetask, SIGBREAKF_CTRL_E|SIGBREAKF_CTRL_C);
+
+    // Wait for cachetask ack
+	DEBUG(kprintf("%s Wait for cache task end\n", CURRENT_TASK));
+    WaitPort(s->StartupMsg->Msg.mn_ReplyPort);
+    while(GetMsg(s->StartupMsg->Msg.mn_ReplyPort));
+
+    cachetask = NULL;
+
+	DEBUG(kprintf("%s Done\n", CURRENT_TASK));
+
+    if(s->type == STREAMTYPE_STREAM && oldSocketBase)
+    {
+		int fd;
+
+		DEBUG(kprintf("%s Giving back socket to main thread\n", CURRENT_TASK));
+
+		// Restore socketbase and descriptor
+		SocketBase = oldSocketBase;
+		fd = ObtainSocket(fdkey, AF_INET, SOCK_STREAM, 0);
+
+		if(fd != -1)
+		{
+			s->fd = fd;
+		}
+		else
+		{
+			DEBUG(kprintf("%s Couldn't obtain socket with key %d\n", CURRENT_TASK, fdkey));
+		}
+    }
+
+	DEBUG(kprintf("%s Free local stream\n", CURRENT_TASK));
+    free(((cache_vars_t*)s->StartupMsg->s)->stream);
+
+	DEBUG(kprintf("%s Delete port & message\n", CURRENT_TASK));
+    DeleteMsgPort(s->StartupMsg->Msg.mn_ReplyPort);
+    FreeVec(s->StartupMsg);
+
+#if MPLAYER
+#ifdef CONFIG_GUI
+	  if(use_gui)
+  	  {
+		  if(dump_f)
+		  {
+		  	fclose(dump_f);
+		  	dump_f = NULL;
+			mp_msg(MSGT_CPLAYER,MSGL_STATUS,"Stream captured to %s\n",stream_dump_name);
+	  	  }
+	  }
+#endif
+#endif
+
+#else /* __MORPHOS__ */
     kill(s->cache_pid,SIGKILL);
     waitpid(s->cache_pid,NULL,0);
 #endif
@@ -394,13 +569,163 @@ void cache_uninit(stream_t *s) {
   c->stream = NULL;
   shared_free(s->cache_data, sizeof(cache_vars_t));
   s->cache_data = NULL;
+#ifdef __MORPHOS__
+  DEBUG(kprintf("%s cache_uninit done\n", CURRENT_TASK));
+#endif
 }
+
+#ifdef __MORPHOS__
+
+void interrupt_handler(int sig)
+{
+	// prevent exit on a break-c, and reset errno
+	errno = 0;
+#if 0
+	if(maintask)
+	{
+		Signal(maintask, SIGBREAKF_CTRL_C);
+	}
+#endif
+}
+
+void CacheTask(void) {
+   cache_vars_t* s = NULL;
+   struct CustomMsg *My_StartupMsg;
+   struct Library * newSocketBase = NULL;
+   int fd = -1;
+   int sleep_count = 0;
+
+   DEBUG(kprintf("%s Starting\n", CURRENT_TASK));
+
+   signal(SIGINT, interrupt_handler);
+#ifdef __AROS__
+    My_StartupMsg = ((struct Process *)FindTask(NULL))->pr_Task.tc_UserData;
+#else
+   if (!(NewGetTaskAttrs(NULL, &My_StartupMsg, sizeof(struct CustomMsg *), TASKINFOTYPE_STARTUPMSG, TAG_DONE))) goto fail;
+#endif
+   if (!My_StartupMsg) goto fail;
+
+   s = (cache_vars_t*) My_StartupMsg->s;
+
+   if(s && (s->stream->type == STREAMTYPE_STREAM) && SocketBase)
+   {
+		// Reopen in this task context
+		// It would be nicer to override socketbase name, to be really safe...
+		newSocketBase = OpenLibrary("bsdsocket.library", 0);
+
+		if(newSocketBase)
+		{
+			SocketBase = newSocketBase;
+
+			//if(1)
+			if(SocketBaseTags(SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (ULONG) &errno, SBTM_SETVAL(SBTC_LOGTAGPTR), (ULONG) "MPlayer", TAG_DONE) == 0)
+			{
+				// Get socket from main thread
+				fd = ObtainSocket(fdkey, AF_INET, SOCK_STREAM, 0); /* what about sock_dgram ? */
+
+				if(fd != -1)
+				{
+					// This is the new descriptor to be used. Let's hope there aren't any further calls in main thread
+					s->stream->fd = fd;
+				}
+				else
+				{
+					DEBUG(kprintf("%s ObtainSocket key=%x failed\n", CURRENT_TASK, fdkey));
+					goto fail;
+				}
+			}
+			else
+			{
+				goto fail;
+			}
+		}
+		else
+		{
+			goto fail;
+		}
+   }
+   else if(s->stream->type == STREAMTYPE_DVD || s->stream->type == STREAMTYPE_DVDNAV)
+   {
+	 gdvdcss_open();
+   }
+
+//	 s->stream->fd = dup(s->stream->fd);
+//	 s->stream->cache_pid = 1;
+
+   DEBUG(kprintf("%s Starting Loop\n", CURRENT_TASK));
+
+   while( !(SetSignal(0L, SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_E) & (SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_E)) )
+   {
+		DEBUG(kprintf("%s Loop\n", CURRENT_TASK));
+		if ( !cache_fill(s) )
+		{
+			DEBUG(kprintf("%s Wait idle\n", CURRENT_TASK));
+            if (sleep_count < INITIAL_FILL_USLEEP_COUNT) {
+                sleep_count++;
+				usleep(INITIAL_FILL_USLEEP_TIME);
+            } else
+				usleep(FILL_USLEEP_TIME); // idle
+		}
+		else
+		{
+			sleep_count = 0;
+		}
+        cache_execute_control((cache_vars_t*)s);
+   }
+
+   DEBUG(kprintf("%s Exiting loop\n", CURRENT_TASK));
+fail:
+
+   if(s && s->stream->type == STREAMTYPE_STREAM && newSocketBase)
+   {
+		// Give socket to main thread
+		if(fd != -1)
+		{
+			DEBUG(kprintf("%s ReleaseCopyOfsocket\n", CURRENT_TASK));
+			fdkey = ReleaseCopyOfSocket(s->stream->fd, time(NULL));
+
+			if(fdkey == -1)
+			{
+				DEBUG(kprintf("%s ReleaseCopyOfSocket failed\n", CURRENT_TASK));
+			}
+		}
+
+/*
+		if (s->stream->fd >= 0)
+			closesocket(s->stream->fd);
+		s->stream->fd = -1;
+*/
+		DEBUG(kprintf("%s Closing bsdsocket\n", CURRENT_TASK));
+		CloseLibrary(SocketBase);
+	    SocketBase = NULL;
+		newSocketBase = NULL;
+   }
+   else if(s && (s->stream->type == STREAMTYPE_DVD || s->stream->type == STREAMTYPE_DVDNAV))
+   {
+	 gdvdcss_close();
+   }
+
+   if(s)
+	   s->stream->cache_pid = 0;
+
+   if(errno != 0) errno = 0;
+
+#ifdef __AROS__
+    if (My_StartupMsg) ReplyMsg((struct Message *)My_StartupMsg);
+#endif
+
+   DEBUG(kprintf("%s Bye\n", CURRENT_TASK));
+}
+
+#else
 
 #if FORKED_CACHE
 static void exit_sighandler(int x){
   // close stream
   exit(0);
 }
+
+#endif
 
 static void dummy_sighandler(int x) {
 }
@@ -442,9 +767,11 @@ static void cache_mainloop(cache_vars_t *s) {
  * \return 1 on success, 0 if the function was interrupted and -1 on error
  */
 int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_limit){
-  int ss = stream->sector_size ? stream->sector_size : STREAM_BUFFER_SIZE;
+  int ss=(stream->type==STREAMTYPE_VCD)?VCD_SECTOR_DATA:STREAM_BUFFER_SIZE;
   int res = -1;
   cache_vars_t* s;
+
+  DEBUG(kprintf("%s stream_enable_cache\n", CURRENT_TASK));
 
   if (stream->flags & STREAM_NON_CACHEABLE) {
     mp_msg(MSGT_CACHE,MSGL_STATUS,"\rThis stream is non-cacheable\n");
@@ -465,10 +792,10 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
   //make sure that we won't wait from cache_fill
   //more data than it is allowed to fill
   if (s->seek_limit > s->buffer_size - s->fill_limit ){
-     s->seek_limit = s->buffer_size - s->fill_limit;
+	 s->seek_limit = s->buffer_size - s->fill_limit;
   }
   if (min > s->buffer_size - s->fill_limit) {
-     min = s->buffer_size - s->fill_limit;
+	 min = s->buffer_size - s->fill_limit;
   }
   // to make sure we wait for the cache process/thread to be active
   // before continuing
@@ -488,6 +815,65 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
     stream->cache_pid = _beginthread( ThreadProc, 0, s );
 #elif defined(__OS2__)
     stream->cache_pid = _beginthread( ThreadProc, NULL, 256 * 1024, s );
+#elif defined(__MORPHOS__)
+	DEBUG(kprintf("%s buffer_size = %d seek_limit = %d fill_limit = %d min = %d\n", CURRENT_TASK, s->buffer_size, s->seek_limit, s->fill_limit, min));
+
+	if (!(stream->StartupMsg = (struct CustomMsg *) AllocVec( sizeof(struct CustomMsg), MEMF_PUBLIC ) ) )return -1;
+
+	stream->StartupMsg->Msg.mn_Node.ln_Type = NT_MESSAGE;
+	stream->StartupMsg->Msg.mn_ReplyPort = CreateMsgPort();
+	stream->StartupMsg->Msg.mn_Length = sizeof(struct CustomMsg);
+	stream->StartupMsg->s = (APTR) s;
+
+	if (!stream->StartupMsg->Msg.mn_ReplyPort ) return -1;
+
+	DEBUG(kprintf("%s About to create CacheTask\n", CURRENT_TASK));
+
+	if(s->stream->type == STREAMTYPE_STREAM)
+	{
+		 // backup old socketbase that will be reopened in cache task
+		 oldSocketBase = SocketBase;
+
+		 // prepare to pass socket to cachetask
+		 fdkey = ReleaseCopyOfSocket(stream->fd, time(NULL));
+
+		 if(fdkey == -1)
+		 {
+			 return -1;
+		 }
+
+		 stream->fd = -1;
+	}
+	else if(s->stream->type == STREAMTYPE_DVD || s->stream->type == STREAMTYPE_DVDNAV)
+	{
+		 gdvdcss_close();
+	}
+
+#if !defined(__AROS__)
+	if ( ! (cachetask = CreateNewProcTags(  NP_CodeType,       CODETYPE_PPC,
+						 NP_Entry,                  (ULONG) CacheTask,
+						 NP_StartupMsg,             (ULONG) stream->StartupMsg,
+#else
+    if ( ! (cachetask = CreateNewProcTags(
+                         NP_Entry,                  (ULONG) CacheTask,
+                         NP_UserData,               (IPTR)stream->StartupMsg,
+#endif
+						 //NP_Priority,               1,
+						 NP_Input,                  Input(),
+						 NP_CloseInput,             FALSE,
+						 NP_Output,                 Output(),
+						 NP_CloseOutput,            FALSE,
+#if !defined(__AROS__)
+						 NP_PPCStackSize,           512*1024,
+#else
+						 NP_StackSize,              512*1024,
+#endif
+						 NP_Name,                   "MPlayer Cache Thread",
+						 TAG_DONE) ) ) return -1; // Unable to create the Process
+
+	DEBUG(kprintf("%s CacheTask created\n", CURRENT_TASK));
+
+	stream->cache_pid = 1;
 #else
     {
     pthread_t tid;
@@ -504,7 +890,7 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
     // wait until cache is filled at least prefill_init %
     mp_msg(MSGT_CACHE,MSGL_V,"CACHE_PRE_INIT: %"PRId64" [%"PRId64"] %"PRId64"  pre:%"PRId64"  eof:%d  \n",
 	s->min_filepos,s->read_filepos,s->max_filepos,min,s->eof);
-    while(s->read_filepos<s->min_filepos || s->max_filepos-s->read_filepos<min){
+	while(s->read_filepos<s->min_filepos || s->max_filepos-s->read_filepos<min){
 	mp_msg(MSGT_CACHE,MSGL_STATUS,MSGTR_CacheFill,
 	    100.0*(float)(s->max_filepos-s->read_filepos)/(float)(s->buffer_size),
 	    s->max_filepos-s->read_filepos
@@ -518,9 +904,6 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
     mp_msg(MSGT_CACHE,MSGL_STATUS,"\n");
     return 1; // parent exits
 
-err_out:
-    cache_uninit(stream);
-    return res;
   }
 
 #if FORKED_CACHE
@@ -529,6 +912,10 @@ err_out:
   // make sure forked code never leaves this function
   exit(0);
 #endif
+
+err_out:
+    cache_uninit(stream);
+    return res;
 }
 
 #if !FORKED_CACHE
@@ -548,15 +935,27 @@ static void *ThreadProc( void *s ){
 int cache_stream_fill_buffer(stream_t *s){
   int len;
   int sector_size;
-  if(!s->cache_pid) return stream_fill_buffer(s);
+
+  DEBUG(kprintf("%s cache_stream_fill_buffer s->type = %d eof = %d\n", CURRENT_TASK, s->type, s->eof));
+  DEBUG(kprintf("%s buf_pos = %d buf_len = %d\n", CURRENT_TASK, s->buf_pos, s->buf_len));
+
+  //if(s->eof){ s->buf_pos=s->buf_len=0; return 0; } // XXX: still needed?
+  if(!s->cache_pid || FindTask(NULL) != maintask)
+  {
+	DEBUG(kprintf("%s stream_fill_buffer\n", CURRENT_TASK));
+	return stream_fill_buffer(s);
+  }
+
+  DEBUG(kprintf("%s cache_stream_fill_buffer pos = %lld read_filepos %lld\n", CURRENT_TASK, (quad_t) s->pos, ((cache_vars_t*)s->cache_data)->read_filepos));
 
   if(s->pos!=((cache_vars_t*)s->cache_data)->read_filepos) mp_msg(MSGT_CACHE,MSGL_ERR,"!!! read_filepos differs!!! report this bug...\n");
   sector_size = ((cache_vars_t*)s->cache_data)->sector_size;
+/*
   if (sector_size > STREAM_MAX_SECTOR_SIZE) {
     mp_msg(MSGT_CACHE, MSGL_ERR, "Sector size %i larger than maximum %i\n", sector_size, STREAM_MAX_SECTOR_SIZE);
     sector_size = STREAM_MAX_SECTOR_SIZE;
   }
-
+*/
   len=cache_read(s->cache_data,s->buffer, sector_size);
   //printf("cache_stream_fill_buffer->read -> %d\n",len);
 
@@ -585,6 +984,14 @@ int cache_stream_seek_long(stream_t *stream,int64_t pos){
   int64_t newpos;
   if(!stream->cache_pid) return stream_seek_long(stream,pos);
 
+  DEBUG(kprintf("%s cache_stream_seek_long pos = %lld\n", CURRENT_TASK, pos));
+
+  if(!stream->cache_pid || FindTask(NULL) != maintask)
+  {
+	  DEBUG(kprintf("%s stream_seek_long\n", CURRENT_TASK));
+	  return stream_seek_long(stream,pos);
+  }
+
   s=stream->cache_data;
 //  s->seek_lock=1;
 
@@ -599,14 +1006,14 @@ int cache_stream_seek_long(stream_t *stream,int64_t pos){
 
   pos-=newpos;
   if(pos>=0 && pos<=stream->buf_len){
-    stream->buf_pos=pos; // byte position in sector
-    return 1;
+	stream->buf_pos=pos; // byte position in sector
+	return 1;
   }
 
 //  stream->buf_pos=stream->buf_len=0;
 //  return 1;
 
-  mp_msg(MSGT_CACHE,MSGL_V,"cache_stream_seek: WARNING! Can't seek to 0x%"PRIX64" !\n",pos+newpos);
+//  mp_msg(MSGT_CACHE,MSGL_V,"cache_stream_seek: WARNING! Can't seek to 0x%"PRIX64" !\n",pos+newpos);
   return 0;
 }
 
@@ -686,3 +1093,5 @@ int cache_do_control(stream_t *stream, int cmd, void *arg) {
   }
   return s->control_res;
 }
+
+#endif

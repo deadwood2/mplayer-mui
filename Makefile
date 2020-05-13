@@ -306,6 +306,7 @@ SRCS_COMMON = asxparser.c \
               m_config.c \
               m_option.c \
               m_struct.c \
+			  morphos_stuff.c \
               mp_msg.c \
               mp_strings.c \
               mpcommon.c \
@@ -560,6 +561,66 @@ SRCS_MPLAYER-$(GUI_WIN32)    += gui/win32/dialogs.c \
                                 gui/win32/widgetrender.c \
                                 gui/win32/wincfg.c \
 
+SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
+								gui/morphos/mui.c \
+								gui/morphos/classes.c \
+								gui/morphos/interface.c \
+								gui/morphos/thread.c \
+								gui/morphos/cfg.c \
+								gui/morphos/playlist.c \
+								gui/morphos/appclass.c \
+								gui/morphos/mplayerwindowclass.c \
+								gui/morphos/mplayergroupclass.c \
+								gui/morphos/playlistgroupclass.c \
+								gui/morphos/urlgroupclass.c \
+								gui/morphos/dvddirgroupclass.c \
+								gui/morphos/propertiesgroupclass.c \
+								gui/morphos/prefsgroupclass.c \
+								gui/morphos/prefslistclass.c \
+								gui/morphos/prefsgeneralgroupclass.c \
+								gui/morphos/playlistlistclass.c \
+								gui/morphos/seeksliderclass.c \
+								gui/morphos/volumesliderclass.c \
+								gui/morphos/picturebuttonclass.c \
+								gui/morphos/spacerclass.c \
+								gui/morphos/videoareaclass.c \
+								gui/morphos/poplistclass.c \
+								gui/morphos/popstringclass.c \
+								gui/morphos/urlpopstringclass.c \
+								gui/morphos/prefspopstringclass.c \
+								gui/morphos/cropgroupclass.c \
+								gui/morphos/scalegroupclass.c \
+								gui/morphos/audiogaingroupclass.c \
+								gui/morphos/consolegroupclass.c \
+								gui/morphos/consolelistclass.c
+
+SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
+								gui/morphos/classes.c \
+								gui/morphos/interface.c \
+								gui/morphos/thread.c \
+								gui/morphos/cfg.c \
+								gui/morphos/playlist.c \
+								gui/morphos/appclass.c \
+								gui/morphos/mplayerwindowclass.c \
+								gui/morphos/mplayergroupclass.c \
+								gui/morphos/playlistgroupclass.c \
+								gui/morphos/urlgroupclass.c \
+								gui/morphos/dvddirgroupclass.c \
+								gui/morphos/propertiesgroupclass.c \
+								gui/morphos/prefsgroupclass.c \
+								gui/morphos/prefslistclass.c \
+								gui/morphos/prefsgeneralgroupclass.c \
+								gui/morphos/playlistlistclass.c \
+								gui/morphos/seeksliderclass.c \
+								gui/morphos/volumesliderclass.c \
+								gui/morphos/picturebuttonclass.c \
+								gui/morphos/spacerclass.c \
+								gui/morphos/videoareaclass.c \
+								gui/morphos/poplistclass.c \
+								gui/morphos/popstringclass.c \
+								gui/morphos/prefspopstringclass.c \
+                                aros/aros_stuff.c \
+
 SRCS_MPLAYER-$(IVTV)         += libao2/ao_ivtv.c libvo/vo_ivtv.c
 SRCS_MPLAYER-$(JACK)         += libao2/ao_jack.c
 SRCS_MPLAYER-$(JOYSTICK)     += input/joystick.c
@@ -601,6 +662,13 @@ SRCS_MPLAYER-$(V4L2)          += libvo/vo_v4l2.c
 SRCS_MPLAYER-$(V4L2)          += libao2/ao_v4l2.c
 SRCS_MPLAYER-$(VDPAU)         += libvo/vo_vdpau.c
 SRCS_MPLAYER-$(VESA)          += libvo/gtf.c libvo/vo_vesa.c libvo/vesa_lvo.c
+SRCS_MPLAYER-$(CGX_COMMON)    += libvo/cgx_common.c
+SRCS_MPLAYER-$(CGX_OVERLAY)   += libvo/vo_cgx_overlay.c
+SRCS_MPLAYER-$(CGX_OVERLAY_GUI) += libvo/vo_cgx_overlay_gui.c
+SRCS_MPLAYER-$(CGX_WPA)       += libvo/vo_cgx_wpa.c
+SRCS_MPLAYER-$(CGX_VMEM)      += libvo/vo_cgx_vmem.c
+SRCS_MPLAYER-$(AHI)           += libao2/ao_ahi.c
+SRCS_MPLAYER-$(AHI_DEV)       += libao2/ao_ahi_dev.c
 SRCS_MPLAYER-$(VIDIX)         += libvo/vo_cvidix.c \
                                  libvo/vosub_vidix.c \
                                  vidix/vidix.c \
@@ -637,6 +705,9 @@ SRCS_MPLAYER-$(XVMC)          += libvo/vo_xvmc.c
 SRCS_MPLAYER-$(XVR100)        += libvo/vo_xvr100.c
 SRCS_MPLAYER-$(YUV4MPEG)      += libvo/vo_yuv4mpeg.c
 SRCS_MPLAYER-$(ZR)            += libvo/jpeg_enc.c libvo/vo_zr.c libvo/vo_zr2.c
+
+SRCS_MPLAYER-$(CGX)          += libvo/vo_cgx_overlay.c libvo/vo_cgx_vmem.c libvo/vo_cgx_wpa.c libvo/vo_cgx_overlay_gui.c libvo/cgx_common.c
+SRCS_MPLAYER-$(AHI)          += libao2/ao_ahi.c libao2/ao_ahi_dev.c
 
 SRCS_MPLAYER = command.c \
                m_property.c \
@@ -716,12 +787,14 @@ INSTALL_TARGETS-$(MENCODER) += install-mencoder install-mencoder-man
 INSTALL_TARGETS-$(MPLAYER)  += install-mplayer  install-mplayer-man
 
 DIRS =  . \
+        aros \
         gui \
         gui/skin \
         gui/ui \
         gui/ui/gtk \
         gui/util \
         gui/win32 \
+        gui/morphos \
         gui/wm \
         input \
         libaf \
@@ -744,6 +817,8 @@ DIRS =  . \
         sub \
         TOOLS \
         vidix \
+
+CFLAGS += $(CFLAGS-yes) $(OPTFLAGS)
 
 ALL_DIRS = $(DIRS) \
         libass \
@@ -812,7 +887,7 @@ config.mak: configure
 	@echo "############################################################"
 
 help_mp.h: help/help_mp-en.h $(HELP_FILE)
-	help/help_create.sh $(HELP_FILE) $(CHARSET)
+	help/help_create.sh $(HELP_FILE) "prout"
 
 # rebuild version.h each time the working copy is updated
 version.h: version.sh $(wildcard .svn/entries .git/logs/HEAD)
@@ -825,7 +900,6 @@ version.h: version.sh $(wildcard .svn/entries .git/logs/HEAD)
 	$(CC) $(CFLAGS) -Wno-unused -c -o $@ -x c $<
 
 checkheaders: $(ALLHEADERS:.h=.ho)
-
 
 
 ###### XML documentation ######

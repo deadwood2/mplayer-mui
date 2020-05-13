@@ -19,8 +19,10 @@
 #ifndef MPLAYER_GUI_APP_H
 #define MPLAYER_GUI_APP_H
 
+#ifndef __MORPHOS__
 #include "util/bitmap.h"
 #include "wm/ws.h"
+#endif
 
 /* User events */
 
@@ -70,6 +72,7 @@
 #define evSkinBrowser       15
 #define evMenu              33
 
+#define evDropFile          49
 #define evIconify           11
 #define evExit              1000
 
@@ -78,6 +81,7 @@
 #define ivSetAudio          45
 #define ivSetVideo          46
 #define ivSetSubtitle       47
+#define evSetDVDAngle     5014
 
 #define ivShowPopUpMenu   5005
 #define ivHidePopUpMenu   5006
@@ -96,6 +100,7 @@ typedef struct {
     const char *name;
 } evName;
 
+#ifndef __MORPHOS__
 /* Skin items */
 
 #define itNone      0
@@ -170,13 +175,15 @@ typedef struct {
     int IndexOfMainItems;
     wItem mainItems[MAX_ITEMS];
 
-    int IndexOfPlaybarItems;
+	int IndexOfPlaybarItems;
     wItem playbarItems[MAX_ITEMS];
 
     int IndexOfMenuItems;
     wItem menuItems[MAX_ITEMS];
 } guiItems;
+#endif
 
+#ifndef __MORPHOS__
 extern guiItems guiApp;
 
 wItem *appFindItem(int event);
@@ -184,5 +191,6 @@ int appFindMessage(const char *name);
 void appFreeStruct(void);
 void btnModify(int event, float state);
 void btnSet(int event, int set);
+#endif
 
 #endif /* MPLAYER_GUI_APP_H */

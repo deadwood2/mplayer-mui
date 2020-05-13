@@ -62,7 +62,7 @@ typedef struct mpg_demuxer {
 } mpg_demuxer_t;
 
 static int mpeg_pts_error=0;
-off_t ps_probe = 0;
+quad_t ps_probe = 0;
 
 static int parse_psm(demuxer_t *demux, int len) {
   unsigned char c, id, type;
@@ -135,7 +135,7 @@ static int parse_psm(demuxer_t *demux, int len) {
 //returns the first pts found within TIME_STAMP_PROBE_LEN bytes after stream_pos in demuxer's stream.
 //if no pts is found or an error occurs, -1.0 is returned.
 //Packs are freed.
-static float read_first_mpeg_pts_at_position(demuxer_t* demuxer, off_t stream_pos)
+static float read_first_mpeg_pts_at_position(demuxer_t* demuxer, quad_t stream_pos)
 {
   stream_t *s = demuxer->stream;
   mpg_demuxer_t *mpg_d = demuxer->priv;
@@ -211,7 +211,7 @@ static demuxer_t* demux_mpg_open(demuxer_t* demuxer) {
       //of the stream
 
       //The position where the stream is now
-      off_t pos = stream_tell(s);
+      quad_t pos = stream_tell(s);
       float first_pts = read_first_mpeg_pts_at_position(demuxer, demuxer->movi_start);
       if(first_pts != -1.0)
       {
@@ -451,7 +451,7 @@ static int demux_mpg_read_packet(demuxer_t *demux,int id){
     //============== DVD Audio sub-stream ======================
     if(id==0x1BD){
       int aid, rawa52 = 0;
-      off_t tmppos;
+      quad_t tmppos;
       unsigned int tmp;
 
       tmppos = stream_tell(demux->stream);
@@ -675,7 +675,7 @@ static inline void update_stats(int head)
 static int demux_mpg_probe(demuxer_t *demuxer) {
   int pes=1;
   int tmp;
-  off_t tmppos;
+  quad_t tmppos;
   int file_format = DEMUXER_TYPE_UNKNOWN;
 
   tmppos=stream_tell(demuxer->stream);
@@ -910,9 +910,9 @@ static void demux_seek_mpg(demuxer_t *demuxer, float rel_seek_secs,
     mpg_demuxer_t *mpg_d=(mpg_demuxer_t*)demuxer->priv;
     int precision = 1;
     float oldpts = 0;
-    off_t oldpos = demuxer->filepos;
+    quad_t oldpos = demuxer->filepos;
     float newpts = 0;
-    off_t newpos = (flags & SEEK_ABSOLUTE) ? demuxer->movi_start : oldpos;
+    quad_t newpos = (flags & SEEK_ABSOLUTE) ? demuxer->movi_start : oldpos;
 
     if(mpg_d)
       oldpts = mpg_d->last_pts;
@@ -1113,7 +1113,7 @@ static demuxer_t* demux_mpg_ps_open(demuxer_t* demuxer)
 
     if(!sh_video->format && ps_probe > 0) {
         int head;
-        off_t pos = stream_tell(demuxer->stream);
+        quad_t pos = stream_tell(demuxer->stream);
 
         clear_stats();
         do {

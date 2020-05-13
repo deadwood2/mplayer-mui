@@ -107,7 +107,7 @@ typedef struct __attribute__((__packed__)) stream_header {
 
 typedef struct ogg_syncpoint {
     int64_t granulepos;
-    off_t   page_pos;
+	quad_t  page_pos;
 } ogg_syncpoint_t;
 
 /// A logical stream
@@ -144,7 +144,7 @@ typedef struct ogg_demuxer {
     int              num_sub;
     ogg_syncpoint_t *syncpoints;
     int              num_syncpoint;
-    off_t            pos, last_size;
+	quad_t           pos, last_size;
     int64_t          initial_granulepos;
     int64_t          final_granulepos;
     int64_t          duration;
@@ -216,7 +216,7 @@ static void demux_ogg_add_sub(ogg_stream_t *os, ogg_packet *pack)
     mp_msg(MSGT_DEMUX, MSGL_DBG2, "Ogg sub lines: %d  first: '%s'\n",
             ogg_sub.lines, ogg_sub.text[0]);
 #ifdef CONFIG_ICONV
-    subcp_recode(&ogg_sub);
+    subcp_recode(&ogg_sub); // __MORPHOS__
 #endif
     vo_sub = &ogg_sub;
     vo_osd_changed(OSDTYPE_SUBTITLE);
@@ -557,7 +557,7 @@ static void demux_ogg_scan_stream(demuxer_t *demuxer)
     ogg_stream_t *os;
     ogg_packet op;
     int np, sid, p, samplesize = 1;
-    off_t pos, last_pos;
+	quad_t pos, last_pos;
 
     pos = last_pos = demuxer->movi_start;
 
@@ -787,9 +787,7 @@ int demux_ogg_open(demuxer_t *demuxer)
     sh_audio_t *sh_a;
     sh_video_t *sh_v;
 
-#ifdef CONFIG_ICONV
-    subcp_open(NULL);
-#endif
+	subcp_open(NULL); // __MORPHOS__
 
     s = demuxer->stream;
 
@@ -1398,7 +1396,7 @@ static void demux_ogg_seek(demuxer_t *demuxer, float rel_seek_secs,
     int i, sp, first, precision = 1, do_seek = 1;
     vorbis_info *vi = NULL;
     int64_t gp = 0, old_gp;
-    off_t pos, old_pos;
+	quad_t pos, old_pos;
     int np;
     int is_gp_valid;
     double pts;

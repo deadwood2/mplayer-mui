@@ -37,6 +37,7 @@ int         (*dvdinput_title) (dvd_input_t, int);
 int         (*dvdinput_read)  (dvd_input_t, void *, int, int);
 char *      (*dvdinput_error) (dvd_input_t);
 
+#define HAVE_DVDCSS_DVDCSS_H 1 //__MORPHOS__
 #ifdef HAVE_DVDCSS_DVDCSS_H
 /* linking to libdvdcss */
 #include <dvdcss/dvdcss.h>
@@ -51,9 +52,14 @@ char *      (*dvdinput_error) (dvd_input_t);
 /* dlopening libdvdcss */
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
+#elif __MORPHOS__
 #else
 /* Only needed on MINGW at the moment */
 #include "../../msvc/contrib/dlfcn.c"
+#endif
+
+#ifdef __MORPHOS__
+#define HAVE_DVDCSS_DVDCSS_H 1
 #endif
 
 typedef struct dvdcss_s *dvdcss_handle;
@@ -363,3 +369,15 @@ int dvdinput_setup(void)
     return 0;
   }
 }
+
+#ifdef __MORPHOS__
+void dvdinput_setup_file_access(void)
+{
+    dvdinput_open  = file_open;
+    dvdinput_close = file_close;
+    dvdinput_seek  = file_seek;
+    dvdinput_title = file_title;
+    dvdinput_read  = file_read;
+    dvdinput_error = file_error;
+}
+#endif

@@ -38,6 +38,7 @@
 #include "input/input.h"
 #include "osdep/shmem.h"
 
+//#define CONFIG_GL
 //int vo_flags=0;
 
 int xinerama_screen = -1;
@@ -111,6 +112,14 @@ extern const vo_functions_t video_out_zr;
 extern const vo_functions_t video_out_zr2;
 extern const vo_functions_t video_out_bl;
 extern const vo_functions_t video_out_fbdev2;
+#ifdef __MORPHOS__
+extern vo_functions_t video_out_cgx_overlay;
+extern vo_functions_t video_out_cgx_vmem;
+extern vo_functions_t video_out_cgx_wpa;
+#ifdef CONFIG_GUI
+extern vo_functions_t video_out_cgx_overlay_gui;
+#endif
+#endif
 extern const vo_functions_t video_out_png;
 extern const vo_functions_t video_out_ggi;
 extern const vo_functions_t video_out_aa;
@@ -149,6 +158,17 @@ extern vo_functions_t video_out_xvidix;
 
 const vo_functions_t* const video_out_drivers[] =
 {
+#if defined(__MORPHOS__) && !defined(__AROS__)
+#ifdef CONFIG_GUI
+	&video_out_cgx_overlay_gui,
+#endif
+	&video_out_cgx_overlay,
+	&video_out_cgx_wpa,
+	&video_out_cgx_vmem,
+#endif
+#if defined(__AROS__)
+	&video_out_cgx_wpa,
+#endif
 #ifdef CONFIG_XVR100
         &video_out_xvr100,
 #endif

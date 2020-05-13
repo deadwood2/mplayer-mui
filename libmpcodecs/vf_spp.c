@@ -524,8 +524,8 @@ static void uninit(struct vf_instance *vf){
         vf->priv->temp= NULL;
         free(vf->priv->src);
         vf->priv->src= NULL;
-        free(vf->priv->avctx);
-        vf->priv->avctx= NULL;
+//        free(vf->priv->avctx);
+//        vf->priv->avctx= NULL;
         free(vf->priv->non_b_qp);
         vf->priv->non_b_qp= NULL;
 
@@ -578,8 +578,8 @@ static int vf_open(vf_instance_t *vf, char *args){
 
     init_avcodec();
 
-    vf->priv->avctx= avcodec_alloc_context3(NULL);
-    ff_dsputil_init(&vf->priv->dsp, vf->priv->avctx);
+//    vf->priv->avctx= avcodec_alloc_context3(NULL);
+//    ff_dsputil_init(&vf->priv->dsp, vf->priv->avctx);
 
     vf->priv->log2_count= 3;
 

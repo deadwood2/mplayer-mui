@@ -95,12 +95,19 @@ static int get_udp(int blocking, double *master_position)
 
     static int sockfd = -1;
     if (sockfd == -1) {
+#if !defined(__AROS__)
 #if HAVE_WINSOCK2_H
         DWORD tv = 30000;
 #else
         struct timeval tv = { .tv_sec = 30 };
 #endif
         struct sockaddr_in servaddr = { 0 };
+#else
+        struct sockaddr_in servaddr = { 0 };
+        struct timeval tv;
+        tv.tv_sec = 30;
+        tv.tv_usec = 0;
+#endif
 
         startup();
         sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -158,7 +165,7 @@ void send_udp(const char *send_to_ip, int port, char *mesg)
         // Enable broadcast
         setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &one, sizeof(one));
 
-#if HAVE_WINSOCK2_H
+#if defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__)
         socketinfo.sin_addr.s_addr = inet_addr(send_to_ip);
         ip_valid = socketinfo.sin_addr.s_addr != INADDR_NONE;
 #else

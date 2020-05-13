@@ -34,7 +34,7 @@
 typedef struct {
   int num_frames;
   int current_frame;
-  off_t *filepos;
+  quad_t *filepos;
   unsigned int *frame_size;
 } fli_frames_t;
 
@@ -120,7 +120,7 @@ static demuxer_t* demux_open_fli(demuxer_t* demuxer){
 
   // allocate enough entries for the indices
   //   audit: num_frames is 16bit so it is safe against overflow
-  frames->filepos = malloc(frames->num_frames * sizeof(off_t));
+  frames->filepos = malloc(frames->num_frames * sizeof(quad_t));
   frames->frame_size = malloc(frames->num_frames * sizeof(int));
 
   // create a new video stream header

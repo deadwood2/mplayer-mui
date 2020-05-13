@@ -314,7 +314,7 @@ void uninit_audio(sh_audio_t *sh_audio)
 #endif
 	sh_audio->initialized = 0;
     }
-    free(sh_audio->a_out_buffer);
+	av_free(sh_audio->a_out_buffer);
     sh_audio->a_out_buffer = NULL;
     sh_audio->a_out_buffer_size = 0;
     av_freep(&sh_audio->a_buffer);
@@ -411,7 +411,7 @@ static int filter_n_bytes(sh_audio_t *sh, int len)
 	int newlen = sh->a_out_buffer_len + filter_output->len;
 	mp_msg(MSGT_DECAUDIO, MSGL_V, "Increasing filtered audio buffer size "
 	       "from %d to %d\n", sh->a_out_buffer_size, newlen);
-	sh->a_out_buffer = realloc(sh->a_out_buffer, newlen);
+	sh->a_out_buffer = av_realloc(sh->a_out_buffer, newlen);
 	sh->a_out_buffer_size = newlen;
     }
     memcpy(sh->a_out_buffer + sh->a_out_buffer_len, filter_output->audio,

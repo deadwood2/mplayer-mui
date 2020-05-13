@@ -25,6 +25,17 @@ CpuCaps gCpuCaps;
 
 #include <stdlib.h>
 
+#if defined(__MORPHOS__) && !defined(__AROS__)
+#include <proto/exec.h>
+#include <exec/execbase.h>
+#include <exec/system.h>
+#endif
+
+#if defined(__MORPHOS__)
+int altivec_disabled = 0;
+
+#endif
+
 #if ARCH_X86
 
 #include <stdio.h>
@@ -216,6 +227,9 @@ static void check_os_katmai_support( void )
     mp_msg(MSGT_CPUDETECT,MSGL_WARN, "Cannot test OS support for SSE, disabling to be safe.\n" );
     gCpuCaps.hasSSE=0;
 #endif /* _POSIX_SOURCE */
+#elif defined(__AROS__)
+    /* No changes. AROS kernel support SSE/SSE2 */
+   /* gCpuCaps.hasSSE=0; */
 #else
     /* Do nothing on other platforms for now.
      */
@@ -425,6 +439,7 @@ char *GetCpuFriendlyName(unsigned int regs[], unsigned int regs2[]){
 #include <sys/sysctl.h>
 #elif defined(__AMIGAOS4__)
 /* nothing */
+#elif __MORPHOS__
 #else
 #include <signal.h>
 #include <setjmp.h>
@@ -478,6 +493,24 @@ void GetCpuCaps( CpuCaps *caps)
             if (has_vu != 0)
                 caps->hasAltiVec = 1;
     }
+#elif defined(__MORPHOS__)
+
+  if (altivec_disabled || !(NewGetSystemAttrs(&caps->hasAltiVec, sizeof(caps->hasAltiVec), SYSTEMINFOTYPE_PPC_ALTIVEC, TAG_DONE) ))
+  {
+		caps->hasAltiVec = 0; // If NewGetSystemAttrs fails then I consider caps->hasAltiVec as undefined and prefer to set it
+  }
+  else
+  {
+		if ((((struct ExecBase *)SysBase)->LibNode.lib_Version == 50 &&
+			((struct ExecBase *)SysBase)->LibNode.lib_Revision >= 61) ||
+			((struct ExecBase *)SysBase)->LibNode.lib_Version > 50)
+		{
+		}
+		else
+		{
+			caps->hasAltiVec = 0;
+		}
+  }
 #elif defined(__AMIGAOS4__)
     ULONG result = 0;
 

@@ -227,7 +227,7 @@ void update_subtitles(sh_video_t *sh_video, double refpts, demux_stream_t *d_dvd
                     if (x > -20 && x < 20) // prevent missing subs on pts reset
                         timestamp = 90000*d_dvdsub->pts;
                     else timestamp = 90000*curpts;
-                    mp_dbg(MSGT_CPLAYER, MSGL_V, "\rDVD sub: len=%d  "
+					mp_dbg(MSGT_CPLAYER, MSGL_V, "\rDVD sub: len=%d  "
                            "v_pts=%5.3f  s_pts=%5.3f  ts=%d \n", len,
                            refpts, d_dvdsub->pts, timestamp);
                 }

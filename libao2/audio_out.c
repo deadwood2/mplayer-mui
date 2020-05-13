@@ -31,6 +31,8 @@
 ao_data_t ao_data={0,0,0,0,OUTBURST,-1,0};
 char *ao_subdevice = NULL;
 
+extern const ao_functions_t audio_out_ahi;
+extern const ao_functions_t audio_out_ahi_dev;
 extern const ao_functions_t audio_out_oss;
 extern const ao_functions_t audio_out_coreaudio;
 extern const ao_functions_t audio_out_arts;
@@ -76,6 +78,14 @@ const ao_functions_t* const audio_out_drivers[] =
 #ifdef CONFIG_OSS_AUDIO
         &audio_out_oss,
 #endif
+
+#ifdef __MORPHOS__
+#if !defined(__AROS__)
+   &audio_out_ahi,
+#endif
+   &audio_out_ahi_dev,
+#endif
+
 #ifdef CONFIG_ALSA
         &audio_out_alsa,
 #endif

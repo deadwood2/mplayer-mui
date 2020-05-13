@@ -30,6 +30,12 @@
 
 struct iovec;
 
+#ifdef __MORPHOS__
+// Needed for MsgPort and IORequest
+#include <exec/ports.h>
+#include <exec/io.h>
+#endif
+
 /*****************************************************************************
  * The libdvdcss structure
  *****************************************************************************/
@@ -66,6 +72,13 @@ struct dvdcss_s
     int    b_file;
     char * p_readv_buffer;
     int    i_readv_buf_size;
+#endif
+
+#ifdef __MORPHOS__
+		struct MsgPort *  DVD_MsgPort;
+		struct IOStdReq * DVD_IOReq;
+		APTR DVD_BufPtr;
+		APTR DVD_Buffer;
 #endif
 
 #if !defined(WIN32) && !defined(SYS_OS2)

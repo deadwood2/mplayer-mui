@@ -23,6 +23,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef __AROS__
+#define SIZE_MAX INT32_MAX
+#endif
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
@@ -108,7 +111,7 @@ static int parse_line(char **ptr, char *cols[6])
 }
 
 /* Loads a file into RAM */
-static char *load_file(const char *filename, off_t * length)
+static char *load_file(const char *filename, quad_t * length)
 {
     int fd;
     char *buffer;
@@ -156,7 +159,7 @@ static struct cookie_list_type *load_cookies_from(const char *filename,
 						  *list)
 {
     char *ptr;
-    off_t length;
+    quad_t length;
 
     ptr = load_file(filename, &length);
     if (!ptr)

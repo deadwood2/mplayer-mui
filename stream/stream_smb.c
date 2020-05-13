@@ -75,10 +75,10 @@ static void smb_auth_fn(const char *server, const char *share,
 static int control(stream_t *s, int cmd, void *arg) {
   switch(cmd) {
     case STREAM_CTRL_GET_SIZE: {
-      off_t size = smbc_lseek(s->fd,0,SEEK_END);
+      quad_t size = smbc_lseek(s->fd,0,SEEK_END);
       smbc_lseek(s->fd,s->pos,SEEK_SET);
-      if(size != (off_t)-1) {
-        *((off_t*)arg) = size;
+      if(size != (quad_t)-1) {
+        *((quad_t*)arg) = size;
         return 1;
       }
     }
@@ -86,7 +86,7 @@ static int control(stream_t *s, int cmd, void *arg) {
   return STREAM_UNSUPPORTED;
 }
 
-static int seek(stream_t *s,off_t newpos) {
+static int seek(stream_t *s,quad_t newpos) {
   s->pos = newpos;
   if(smbc_lseek(s->fd,s->pos,SEEK_SET)<0) {
     s->eof=1;
@@ -120,7 +120,7 @@ static void close_f(stream_t *s){
 static int open_f (stream_t *stream, int mode, void *opts, int* file_format) {
   char *filename;
   mode_t m = 0;
-  off_t len;
+  quad_t len;
   int fd, err;
 
   filename = stream->url;

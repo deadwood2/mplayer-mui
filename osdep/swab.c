@@ -16,16 +16,18 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef MPLAYER_DEMUX_TS_H
-#define MPLAYER_DEMUX_TS_H
+#include "config.h"
 
-#include <sys/types.h>
+/* system has no swab.  emulate via bswap */
+#include "mpbswap.h"
+#include <unistd.h>
 
-#define TS_MAX_PROBE_SIZE 2000000
-
-extern quad_t ts_probe;
-extern int   ts_prog;
-extern int   ts_keep_broken;
-extern int audio_substream_id;
-
-#endif /* MPLAYER_DEMUX_TS_H */
+void swab(const void *from, void *to, size_t n) {
+  const int16_t *in = (int16_t*)from;
+  int16_t *out = (int16_t*)to;
+  int i;
+  n /= 2;
+  for (i = 0 ; i < n; i++) {
+    out[i] = bswap_16(in[i]);
+  }
+}

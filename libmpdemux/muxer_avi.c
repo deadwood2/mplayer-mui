@@ -63,7 +63,7 @@ struct avi_stream_info {
 	int superidxsize;
 	int riffofspos;
 	int riffofssize;
-	off_t *riffofs;
+	quad_t *riffofs;
 	struct avi_odmlidx_entry *idx;
 	struct avi_odmlsuperidx_entry *superidx;
 };
@@ -119,8 +119,8 @@ static muxer_stream_t* avifile_new_stream(muxer_t *muxer,int type){
     si->idxsize=256;
     si->idx=calloc(si->idxsize, sizeof(struct avi_odmlidx_entry));
     si->riffofssize=16;
-    si->riffofs=calloc((si->riffofssize+1), sizeof(off_t));
-    memset(si->riffofs, 0, sizeof(off_t)*si->riffofssize);
+    si->riffofs=calloc((si->riffofssize+1), sizeof(quad_t));
+    memset(si->riffofs, 0, sizeof(quad_t)*si->riffofssize);
 
     switch(type){
     case MUXER_TYPE_VIDEO:
@@ -192,7 +192,7 @@ static void avifile_odml_new_riff(muxer_t *muxer)
     vsi->riffofspos++;
     if (vsi->riffofspos>=vsi->riffofssize) {
         vsi->riffofssize+=16;
-        vsi->riffofs=realloc_struct(vsi->riffofs,(vsi->riffofssize+1),sizeof(off_t));
+        vsi->riffofs=realloc_struct(vsi->riffofs,(vsi->riffofssize+1),sizeof(quad_t));
     }
     vsi->riffofs[vsi->riffofspos] = stream_tell(muxer->stream);
 
@@ -514,14 +514,14 @@ static void avifile_write_standard_index(muxer_t *muxer)
 }
 
 static void avifile_write_chunk(muxer_stream_t *s,size_t len,unsigned int flags, double dts, double pts){
-    off_t rifflen;
+	quad_t rifflen;
     muxer_t *muxer=s->muxer;
     struct avi_stream_info *si = s->priv;
     struct avi_stream_info *vsi = muxer->def_v->priv;
     int paddedlen = len + (len&1);
 
     if (s->type == MUXER_TYPE_VIDEO && !s->h.dwSuggestedBufferSize) {
-	off_t pos=stream_tell(muxer->stream);
+	quad_t pos=stream_tell(muxer->stream);
 	stream_seek(muxer->stream, 0);
 	avifile_write_header(muxer);
 	stream_seek(muxer->stream, pos);
@@ -596,7 +596,7 @@ static void avifile_odml_write_index(muxer_t *muxer){
     n = 0;
     entries_per_subidx = INT_MAX;
     do {
-	off_t start = si->idx[0].ofs;
+	quad_t start = si->idx[0].ofs;
 	last = entries_per_subidx;
 	for (j=0; j<si->idxpos; j++) {
 	    len = si->idx[j].ofs - start;
@@ -623,7 +623,7 @@ static void avifile_odml_write_index(muxer_t *muxer){
 
     idxpos = 0;
     for (j=0; j<si->superidxpos; j++) {
-	off_t start = si->idx[idxpos].ofs;
+	quad_t start = si->idx[idxpos].ofs;
 	int duration;
 
 	duration = 0;

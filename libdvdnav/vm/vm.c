@@ -47,6 +47,27 @@
 #include "vm.h"
 #include "dvdnav_internal.h"
 
+#ifdef __MORPHOS__
+#include <proto/exec.h>
+//#include <proto/dos.h>
+#undef Exit
+
+#include <devices/trackdisk.h>
+#include <devices/scsidisk.h>
+
+struct MsgPort *  DVD_MsgPort;
+struct IOStdReq * DVD_IOReq;
+APTR DVD_BufPtr;
+APTR DVD_Buffer;
+int    i_fd;
+int    i_pos;
+
+static int amiga_open  (char const * );
+static void amiga_close(void);
+static int amiga_seek  (int );
+static int amiga_read  (void *, int );
+#endif
+
 #ifdef _MSC_VER
 #include <io.h>   /* read() */
 #endif /* _MSC_VER */
@@ -162,7 +183,8 @@ static int os2_open(const char *name, int oflag)
 }
 #endif
 
-static void dvd_read_name(char *name, char *serial, const char *device) {
+void dvd_read_name(char *name, char *serial, const char *device) {
+#ifndef __MORPHOS__
     /* Because we are compiling with _FILE_OFFSET_BITS=64
      * all off_t are 64bit.
      */
@@ -198,17 +220,20 @@ static void dvd_read_name(char *name, char *serial, const char *device) {
               fprintf(MSG_OUT, " ");
             }
           }
-          strncpy(serial, (char*) &data[73], (i-73));
-          serial[14] = 0;
-          fprintf(MSG_OUT, "\nlibdvdnav: DVD Title (Alternative): ");
-          for(i=89; i < 128; i++ ) {
-            if((data[i] == 0)) break;
-            if((data[i] > 32) && (data[i] < 127)) {
-              fprintf(MSG_OUT, "%c", data[i]);
-            } else {
-              fprintf(MSG_OUT, " ");
+		  if(serial)
+		  {
+            strncpy(serial, (char*) &data[73], (i-73));
+            serial[14] = 0;
+            fprintf(MSG_OUT, "\nlibdvdnav: DVD Title (Alternative): ");
+            for(i=89; i < 128; i++ ) {
+              if((data[i] == 0)) break;
+              if((data[i] > 32) && (data[i] < 127)) {
+                fprintf(MSG_OUT, "%c", data[i]);
+              } else {
+                fprintf(MSG_OUT, " ");
+              }
             }
-          }
+		  }
           fprintf(MSG_OUT, "\n");
         } else {
           fprintf(MSG_OUT, "libdvdnav: Can't read name block. Probably not a DVD-ROM device.\n");
@@ -220,6 +245,87 @@ static void dvd_read_name(char *name, char *serial, const char *device) {
     } else {
     fprintf(MSG_OUT, "NAME OPEN FAILED\n");
   }
+#else
+    /* Because we are compiling with _FILE_OFFSET_BITS=64
+     * all off_t are 64bit.
+     */
+	int	off;
+	int i;
+    uint8_t data[DVD_VIDEO_LB_LEN];
+
+    /* Read DVD name */
+	if (amiga_open(device) == 0)
+    {
+		off = amiga_seek(32);
+		if( off == 32 )
+		{
+			off = amiga_read(data, 1 );
+			if (off == 1 )
+			{
+				fprintf(MSG_OUT, "libdvdnav: DVD Title: ");
+				for(i=25; i < 73; i++ )
+				{
+					if((data[i] == 0)) break;
+					if((data[i] > 32) && (data[i] < 127))
+					{
+						fprintf(MSG_OUT, "%c", data[i]);
+					}
+					else
+					{
+						fprintf(MSG_OUT, " ");
+					}
+				}
+				strncpy(name, &data[25], 48);
+				name[48] = 0;
+				fprintf(MSG_OUT, "\nlibdvdnav: DVD Serial Number: ");
+				for(i=73; i < 89; i++ )
+				{
+					if((data[i] == 0)) break;
+					if((data[i] > 32) && (data[i] < 127))
+					{
+						fprintf(MSG_OUT, "%c", data[i]);
+					}
+					else
+					{
+						fprintf(MSG_OUT, " ");
+					}
+				}
+				if(serial)
+				{
+		            strncpy(serial, (char*) &data[73], (i-73));
+		            serial[14] = 0;
+					fprintf(MSG_OUT, "\nlibdvdnav: DVD Title (Alternative): ");
+					for(i=89; i < 128; i++ )
+					{
+						if((data[i] == 0)) break;
+						if((data[i] > 32) && (data[i] < 127))
+						{
+							fprintf(MSG_OUT, "%c", data[i]);
+						}
+						else
+						{
+							fprintf(MSG_OUT, " ");
+						}
+					}
+				}
+				fprintf(MSG_OUT, "\n");
+			}
+			else
+			{
+				fprintf(MSG_OUT, "libdvdnav: Can't read name block. Probably not a DVD-ROM device.\n");
+			}
+		}
+		else
+		{
+			fprintf(MSG_OUT, "libdvdnav: Can't seek to block %u\n", 32 );
+		}
+		amiga_close();
+	}
+	else
+	{
+		fprintf(MSG_OUT, "NAME OPEN FAILED\n");
+	}
+#endif
 }
 
 static int ifoOpenNewVTSI(vm_t *vm, dvd_reader_t *dvd, int vtsN) {
@@ -2000,4 +2106,198 @@ void vm_position_print(vm_t *vm, vm_position_t *position) {
   position->block);
 }
 #endif
+
+/*****************************************************/
+/*****************************************************/
+/*****************************************************/
+/*              MorphOS/AmigaOS section              */
+/*****************************************************/
+/*****************************************************/
+/*****************************************************/
+#ifdef __MORPHOS__
+#include "amiga_scsi.h"
+
+struct MySCSICmd
+{
+		struct SCSICmd req;
+		SCSICMD12 cmd;
+};
+
+static BOOL DiskPresent(struct IOStdReq *My_IOStdReq);
+static BOOL read_sector (struct IOStdReq *My_IOStdReq, ULONG start_block, ULONG block_count, UBYTE *Data, struct MySCSICmd *MySCSI, BOOL sync);
+static UBYTE Global_SCSISense[SENSE_LEN];
+
+static int amiga_open  (char const * device_name)
+{
+	ULONG dvd_unit;
+	TEXT dvd_device[64];
+	BYTE My_Device=-1;
+	struct MsgPort    *My_MsgPort = NULL;
+	struct IOStdReq   *My_IOReq = NULL;
+	UBYTE *My_Buffer = NULL;
+
+	if ( ! (My_MsgPort = CreateMsgPort() ) ) goto fail;
+
+	if ( ! (My_IOReq = (struct IOStdReq *) CreateIORequest(My_MsgPort, sizeof(struct IOStdReq) ) ) ) goto fail;
+
+	if ( ! (My_Buffer = malloc(sizeof(struct MySCSICmd) + DVD_VIDEO_LB_LEN + 31) ) ) goto fail;
+	{
+		char *temp = strchr(device_name, ':');
+
+		if (!temp) goto fail;
+		dvd_unit = atoi(temp+1);
+		stccpy(dvd_device, device_name, temp - device_name + 1);
+	}
+
+	if ( ( My_Device = OpenDevice(dvd_device, dvd_unit, (struct IORequest *) My_IOReq, 0L) ) ) goto fail;
+
+	if ( !DiskPresent( My_IOReq ) ) {
+		goto fail;
+	}
+
+	i_pos = 0;
+
+	DVD_IOReq    = My_IOReq;
+	i_fd		 = (int) My_IOReq;
+	DVD_MsgPort  = My_MsgPort;
+
+	DVD_BufPtr = My_Buffer;
+	DVD_Buffer = (APTR)((((IPTR)My_Buffer) + sizeof(struct MySCSICmd) + 31) & ~31);
+
+	read_sector(My_IOReq, 0, 1, DVD_Buffer, DVD_BufPtr, 0);
+
+	return 0;
+
+fail:
+	if (!My_Device)   CloseDevice( (struct IORequest *) My_IOReq);
+	if (My_IOReq)     DeleteIORequest( (struct IORequest *) My_IOReq);
+	if (My_MsgPort)   DeleteMsgPort(My_MsgPort);
+	if (My_Buffer)    free(My_Buffer);
+
+	return -1;
+}
+
+static void amiga_close(void)
+{
+	if (DVD_BufPtr)
+	{
+		WaitIO((struct IORequest *)DVD_IOReq);
+		free(DVD_BufPtr);
+		DVD_BufPtr = NULL;
+	}
+	if (DVD_IOReq)
+	{
+		CloseDevice( (struct IORequest *) DVD_IOReq);
+		DeleteIORequest( (struct IORequest *) DVD_IOReq);
+		DVD_IOReq = NULL;
+	}
+	if (DVD_MsgPort)
+	{
+		DeleteMsgPort(DVD_MsgPort);
+		DVD_MsgPort = NULL;
+	}
+}
+
+/*****************************************************/
+static int amiga_seek  (int blocks)
+{
+	if (i_pos != blocks)
+	{
+		WaitIO((struct IORequest *)DVD_IOReq);
+		i_pos = blocks;
+		read_sector(DVD_IOReq, blocks, 1, DVD_Buffer, DVD_BufPtr, 0);
+	}
+	return blocks;
+}
+
+/*****************************************************/
+static int amiga_read  (void *p_buffer, int blocks)
+{
+	WaitIO((struct IORequest *)DVD_IOReq);
+
+	if (blocks == 1)
+	{
+		if (DVD_IOReq->io_Error)
+		{
+			i_pos = -1;
+			DVD_IOReq->io_Flags = IOF_QUICK; /* Prevent WaitIO from doing bad things */
+			return -1;
+		}
+
+		CopyMemQuick(DVD_Buffer, p_buffer, DVD_VIDEO_LB_LEN);
+
+		i_pos += 1;
+	}
+	else
+	{
+		if ( !read_sector(DVD_IOReq, i_pos, blocks, p_buffer, DVD_BufPtr, 1) )
+		{
+			i_pos = -1;
+			return -1;
+		}
+
+		i_pos += blocks;
+	}
+
+	read_sector(DVD_IOReq, i_pos, 1, DVD_Buffer, DVD_BufPtr, 0);
+
+	return blocks;
+}
+
+
+/*****************************************************/
+static BOOL read_sector (struct IOStdReq *My_IOStdReq, ULONG start_block, ULONG block_count, UBYTE *Data, struct MySCSICmd *MySCSI, BOOL sync)
+{
+		MySCSI->cmd.opcode = SCSI_CMD_READ_CD12;
+		MySCSI->cmd.b1 = 0;
+		MySCSI->cmd.b2 = start_block >> 24;
+		MySCSI->cmd.b3 = (start_block >> 16) & 0xFF;
+		MySCSI->cmd.b4 = (start_block >> 8) & 0xFF;
+		MySCSI->cmd.b5 = start_block & 0xFF;
+
+		MySCSI->cmd.b6 = block_count >> 24;
+		MySCSI->cmd.b7 = (block_count >> 16) & 0xFF;
+		MySCSI->cmd.b8 = (block_count >> 8) & 0xFF;
+		MySCSI->cmd.b9 = block_count & 0xFF;
+
+		MySCSI->cmd.b10 = 0;
+		MySCSI->cmd.control = PAD;
+
+		My_IOStdReq->io_Command    = HD_SCSICMD;
+		My_IOStdReq->io_Data       = &MySCSI->req;
+		My_IOStdReq->io_Length     = sizeof(struct SCSICmd);
+
+		MySCSI->req.scsi_Data 			= (UWORD *) Data;
+		MySCSI->req.scsi_Length		= block_count * DVD_VIDEO_LB_LEN;
+		MySCSI->req.scsi_SenseActual = 0;
+		MySCSI->req.scsi_SenseData	= Global_SCSISense;
+		MySCSI->req.scsi_SenseLength	= SENSE_LEN;
+		MySCSI->req.scsi_Command		= (UBYTE *) &MySCSI->cmd;
+		MySCSI->req.scsi_CmdLength	= sizeof(SCSICMD12);
+		MySCSI->req.scsi_Flags			= SCSIF_READ | SCSIF_AUTOSENSE;
+
+		if (sync)
+		{
+			DoIO((struct IORequest *)My_IOStdReq);
+			return My_IOStdReq->io_Error ? FALSE : TRUE;
+		}
+		else
+		{
+			SendIO((struct IORequest *)My_IOStdReq);
+			return TRUE;
+		}
+}
+/*****************************************************/
+static BOOL DiskPresent(struct IOStdReq *My_IOStdReq)
+{
+		My_IOStdReq->io_Command    = TD_CHANGESTATE;
+		My_IOStdReq->io_Flags      = 0;
+
+		DoIO( (struct IORequest *)My_IOStdReq );
+
+		return My_IOStdReq->io_Actual ? FALSE : TRUE;
+}
+
+#endif
+
 

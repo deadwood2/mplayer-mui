@@ -60,6 +60,7 @@ cat <<EOF >> "$TARGET"
 EOF
 
 if test $CHARSET != UTF-8 ; then
-    iconv -f UTF-8 -t "$CHARSET" "$TARGET" > "${TARGET}.tmp"
-    mv "${TARGET}.tmp" "$TARGET"
+#	 iconv -f UTF-8 -t "$CHARSET" "$TARGET" > "${TARGET}.tmp"
+#	 mv "${TARGET}.tmp" "$TARGET"
+	echo "dummy create"
 fi

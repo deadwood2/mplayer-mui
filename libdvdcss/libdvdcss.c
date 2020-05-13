@@ -293,7 +293,8 @@ LIBDVDCSS_EXPORT dvdcss_t dvdcss_open ( char *psz_target )
             psz_home = p_pwd->pw_dir;
         }
 #   endif
-
+// __MORPHOS__
+/*
         if( psz_home == NULL )
         {
             psz_home = getenv( "HOME" );
@@ -302,11 +303,14 @@ LIBDVDCSS_EXPORT dvdcss_t dvdcss_open ( char *psz_target )
         {
             psz_home = getenv( "USERPROFILE" );
         }
+*/
+		psz_home = "PROGDIR:conf/DVDKeys";
 
         /* Cache our keys in ${HOME}/.dvdcss/ */
         if( psz_home )
         {
             int home_pos = 0;
+			snprintf( psz_buffer, PATH_MAX, "%s", psz_home );
 
 #ifdef SYS_OS2
             if( *psz_home == '/' || *psz_home == '\\')

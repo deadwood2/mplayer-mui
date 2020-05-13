@@ -224,6 +224,7 @@ issystem() {
 }
 aix()       { issystem "AIX"; }
 amigaos()   { issystem "AmigaOS"; }
+aros()      { issystem "AROS"; }
 bsdos()     { issystem "BSD/OS"; }
 cygwin()    { issystem "CYGWIN"; }
 darwin()    { issystem "Darwin"; }
@@ -1534,6 +1535,7 @@ else # if test -z "$_target"
       amigaos) system_name=AmigaOS ;;
       mingw32*) system_name=MINGW32 ;;
       wine) system_name=Wine ;;
+      aros) system_name=AROS ;;
     esac
   done
   # We need to convert underscores so that values like k6-2 and pentium-mmx can be passed
@@ -1589,6 +1591,20 @@ if amigaos ; then
   _stream_cache=no
   def_stream_cache="#undef CONFIG_STREAM_CACHE"
   extra_cflags="-DNEWLIB -D__USE_INLINE__ $extra_cflags"
+fi
+
+if aros ; then
+  extra_cflags="-nix -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -Iaros/include -Ilibdvdnav $extra_cflags"
+  extra_ldflags="$extra_ldflags -nix -L./aros/obj -lmissing -lcybergraphics"
+  _aros_common=yes
+  _cgx_common=yes
+  _cgx_wpa=yes
+  _ahi_dev=yes
+  _bindir="PROGDIR:"
+  _datadir="PROGDIR:conf"
+  _mandir="PROGDIR:man"
+  _confdir="PROGDIR:conf"
+  _libdir="PROGDIR:"
 fi
 
 if qnx ; then
@@ -3154,12 +3170,22 @@ echores "$_nanosleep"
 
 
 echocheck "socklib"
+if aros ; then
+cat > $TMPC << EOF
+#include <netdb.h>
+#include <proto/socket.h>
+#include <sys/socket.h>
+struct Library * SocketBase = NULL;
+int main(void) { (void) gethostbyname(0); (void) socket(AF_INET, SOCK_STREAM, 0); return 0; }
+EOF
+else
 # for Solaris (socket stuff is in -lsocket, gethostbyname and friends in -lnsl):
 cat > $TMPC << EOF
 #include <netdb.h>
 #include <sys/socket.h>
 int main(void) { gethostbyname(0); socket(AF_INET, SOCK_STREAM, 0); return 0; }
 EOF
+fi
 _socklib=no
 for ld_tmp in "" "-lsocket -ldnet" "-lsocket -lnsl" "-lnsl" "-lsocket" ; do
   cc_check $ld_tmp && ld_sock="$ld_tmp" && _socklib=yes && break
@@ -3292,11 +3318,16 @@ cc_check $cc_check_winsock2_h && _struct_sockaddr_sa_len=yes &&
 echores "$_struct_sockaddr_sa_len"
 
 
+# AROS: Check modified to include <sys/socket.h>
 echocheck "arpa/inet.h"
 arpa_inet_h=no
 def_arpa_inet_h='#define HAVE_ARPA_INET_H 0'
-header_check arpa/inet.h && arpa_inet_h=yes &&
-  def_arpa_inet_h='#define HAVE_ARPA_INET_H 1'
+cat > $TMPC << EOF
+#include <sys/socket.h>
+#include <arpa/inet.h>
+int main(void) { return 0; }
+EOF
+cc_check && arpa_inet_h=yes && def_arpa_inet_h='#define HAVE_ARPA_INET_H 1'
 echores "$arpa_inet_h"
 
 
@@ -3353,6 +3384,9 @@ echores "$_closesocket"
 echocheck "networking"
 test $_winsock2_h = no && test $inet_pton = no &&
   test $inet_aton = no && networking=no
+if aros ; then
+networking=yes
+fi
 if test "$networking" = yes ; then
   def_network='#define CONFIG_NETWORK 1'
   def_networking='#define CONFIG_NETWORKING 1'
@@ -5676,11 +5710,13 @@ elif sunos ; then
   test $(uname -r | sed 's/^5\.//') -gt 10 && default_cdrom_device="/cdrom/cdrom0"
 elif amigaos ; then
   default_cdrom_device="a1ide.device:2"
+elif aros ; then
+  default_cdrom_device="ata.device:2"
 else
   default_cdrom_device="/dev/cdrom"
 fi
 
-if win32 || os2 || dragonfly || freebsd || openbsd || sunos || amigaos ; then
+if win32 || os2 || dragonfly || freebsd || openbsd || sunos || amigaos || aros ; then
   default_dvd_device=$default_cdrom_device
 elif darwin ; then
   default_dvd_device="/dev/rdiskN"
@@ -5692,7 +5728,7 @@ fi
 echocheck "VCD support"
 if test "$_vcd" = auto; then
   _vcd=no
-  if linux || freebsd || netbsd || openbsd || dragonfly || bsdos || darwin || sunos || os2; then
+  if linux || freebsd || netbsd || openbsd || dragonfly || bsdos || darwin || sunos || os2 ; then
     _vcd=yes
   elif mingw32; then
   header_check ddk/ntddcdrm.h && _vcd=yes
@@ -5733,6 +5769,10 @@ if test "$_dvdread_internal" = auto ; then
      (test "$_dvd" = yes || test "$_cdrom" = yes || test "$_cdio" = yes ||
       test "$_dvdio" = yes || test "$_bsdi_dvd" = yes) ||
      darwin || win32 || os2; then
+    _dvdread_internal=yes
+    _dvdread=yes
+    extra_cflags="-Ilibdvdread4 $extra_cflags"
+  elif aros ; then
     _dvdread_internal=yes
     _dvdread=yes
     extra_cflags="-Ilibdvdread4 $extra_cflags"
@@ -5878,6 +5918,8 @@ else
 fi
 echores "$_bitmap_font"
 
+if aros ; then
+#FreeType AROS check
 
 echocheck "freetype >= 2.0.9"
 
@@ -5885,6 +5927,125 @@ echocheck "freetype >= 2.0.9"
 if test "$_iconv" = no ; then
     _freetype=no
     res_comment="iconv support needed"
+fi
+
+if test "$_freetype" = auto ; then
+
+   cat > $TMPC << EOF
+#include <stdio.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#if ((FREETYPE_MAJOR < 2) || ((FREETYPE_MINOR == 0) && (FREETYPE_PATCH < 9)))
+#error "Need FreeType 2.0.9 or newer"
+#endif
+int main(void) {
+    FT_Library library;
+    FT_Int major=-1,minor=-1,patch=-1;
+    int err=FT_Init_FreeType(&library);
+    return 0;
+}
+EOF
+   _freetype=no
+   cc_check -lfreetype2 && _freetype=yes
+fi
+if test "$_freetype" = yes ; then
+    def_freetype='#define CONFIG_FREETYPE 1'
+    extra_ldflags="$extra_ldflags -lfreetype2"
+else
+    def_freetype='#undef CONFIG_FREETYPE'
+fi
+echores "$_freetype"
+
+if test "$_freetype" = no ; then
+    _fontconfig=no
+    _res_comment="FreeType support needed"
+fi
+echocheck "fontconfig"
+if test "$_fontconfig" = auto ; then
+        cat > $TMPC << EOF
+#include <stdio.h>
+#include <stdlib.h>
+#include <fontconfig/fontconfig.h>
+#if FC_VERSION < 20402
+#error At least version 2.4.2 of fontconfig required
+#endif
+int main(void) {
+    int err = FcInit();
+    if (err == FcFalse) {
+        printf("Couldn't initialize fontconfig lib\n");
+        exit(err);
+    }
+    return 0;
+}
+EOF
+  _fontconfig=no
+  for _ld_tmp in "" "-lexpat -lfreetype" "-lexpat -lfreetype -lz" "-lexpat -lfreetype -lz -liconv" ; do
+    _ld_tmp="-lfontconfig $_ld_tmp"
+    cc_check $_ld_tmp && _fontconfig=yes && extra_ldflags="$extra_ldflags $_ld_tmp" && break
+  done
+  if test "$_fontconfig" = no && $_pkg_config --exists fontconfig ; then
+    _inc_tmp=$($_pkg_config --cflags fontconfig)
+    _ld_tmp=$($_pkg_config --libs fontconfig)
+    cc_check $_inc_tmp $_ld_tmp && _fontconfig=yes \
+      && extra_ldflags="$extra_ldflags $_ld_tmp" && extra_cflags="$extra_cflags $_inc_tmp"
+  fi
+fi
+if test "$_fontconfig" = yes ; then
+    def_fontconfig='#define CONFIG_FONTCONFIG 1'
+else
+    def_fontconfig='#undef CONFIG_FONTCONFIG'
+fi
+echores "$_fontconfig"
+
+
+echocheck "SSA/ASS support"
+# libass depends on FreeType
+if test "$_freetype" = no ; then
+    _ass=no
+    ass_internal=no
+    _res_comment="FreeType support needed"
+fi
+
+if test "$_ass" = auto ; then
+    cat > $TMPC << EOF
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#if ((FREETYPE_MAJOR < 2) || (FREETYPE_MINOR < 2) || ((FREETYPE_MINOR == 2) && (FREETYPE_PATCH < 1)))
+#error "Need FreeType 2.2.1 or newer"
+#endif
+int main(void) { return 0; }
+EOF
+    _ass=no
+    cc_check && _ass=yes
+    if test "$_ass" = no ; then
+        ass_internal=no
+        _res_comment="FreeType >= 2.2.1 needed"
+    elif test "$ass_internal" = no ; then
+        _res_comment="external"
+        extra_ldflags="$extra_ldflags -lass"
+    fi
+fi
+if test "$_ass" = yes ; then
+    def_ass='#define CONFIG_ASS 1'
+else
+    def_ass='#undef CONFIG_ASS'
+fi
+if test "$ass_internal" = yes ; then
+    def_ass_internal='#define CONFIG_ASS_INTERNAL 1'
+else
+    def_ass_internal='#undef CONFIG_ASS_INTERNAL'
+fi
+echores "$_ass"
+
+else
+#FreeType regular check
+
+echocheck "freetype >= 2.0.9"
+
+# freetype depends on iconv
+if test "$_iconv" = no ; then
+    _freetype=no
+    _res_comment="iconv support needed"
 fi
 
 if test "$_freetype" = auto ; then
@@ -6044,6 +6205,7 @@ else
     ass_internal=no
 fi
 echores "$_ass"
+fi
 
 
 echocheck "ENCA"
@@ -7441,7 +7603,11 @@ if test "$_gui" = yes ; then
   fi
   test "$_freetype" = no && test "$_bitmap_font" = no &&
     die "The GUI requires either FreeType or bitmap font support."
-if ! win32 ; then
+if aros ; then
+  _gui_mui=yes
+  libs_mplayer="$libs_mplayer -lmui"
+  def_gui='#define CONFIG_GUI 1'
+elif ! win32 ; then
   _gui_gtk=yes
   test "$_x11" != yes && die "X11 support required for GUI compilation."
 
@@ -8022,16 +8188,20 @@ VSSCANF      = $vsscanf
 # features
 3DFX = $_3dfx
 AA = $_aa
+AHI_DEV = $_ahi_dev
 ALSA = $_alsa
 APPLE_IR = $_apple_ir
 APPLE_REMOTE = $_apple_remote
 ARTS = $_arts
+AROS_COMMON = $_aros_common
 AUDIO_INPUT = $_audio_input
 BITMAP_FONT = $_bitmap_font
 BL = $_bl
 CACA = $_caca
 CDDA = $_cdda
 CDDB = $_cddb
+CGX_COMMON = $_cgx_common
+CGX_WPA = $_cgx_wpa
 COREAUDIO = $_coreaudio
 COREVIDEO = $_corevideo
 DART = $_dart
@@ -8063,6 +8233,7 @@ GL_SDL = $_gl_sdl
 MATRIXVIEW = $matrixview
 GUI = $_gui
 GUI_GTK = $_gui_gtk
+GUI_MUI = $_gui_mui
 GUI_WIN32 = $_gui_win32
 HAVE_POSIX_SELECT = $_posix_select
 HAVE_SYS_MMAN_H = $_mman

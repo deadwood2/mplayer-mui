@@ -155,7 +155,7 @@ typedef struct mkv_index {
 } mkv_index_t;
 
 typedef struct mkv_demuxer {
-    off_t segment_start;
+	quad_t segment_start;
 
     float duration, last_pts;
     uint64_t last_filepos;
@@ -172,9 +172,9 @@ typedef struct mkv_demuxer {
     mkv_index_t *indexes;
     int num_indexes;
 
-    off_t *parsed_cues;
+	quad_t *parsed_cues;
     int parsed_cues_num;
-    off_t *parsed_seekhead;
+	quad_t *parsed_seekhead;
     int parsed_seekhead_num;
 
     uint64_t *cluster_positions;
@@ -959,7 +959,7 @@ static int demux_mkv_read_cues(demuxer_t *demuxer)
     mkv_demuxer_t *mkv_d = (mkv_demuxer_t *) demuxer->priv;
     stream_t *s = demuxer->stream;
     uint64_t length, l, time, track, pos;
-    off_t off;
+	quad_t off;
     int i, il;
 
     if (index_mode == 0) {
@@ -973,7 +973,7 @@ static int demux_mkv_read_cues(demuxer_t *demuxer)
             return 0;
         }
     mkv_d->parsed_cues = realloc(mkv_d->parsed_cues,
-                                 (mkv_d->parsed_cues_num + 1) * sizeof(off_t));
+								 (mkv_d->parsed_cues_num + 1) * sizeof(quad_t));
     mkv_d->parsed_cues[mkv_d->parsed_cues_num++] = off;
 
     mp_msg(MSGT_DEMUX, MSGL_V, "[mkv] /---- [ parsing cues ] -----------\n");
@@ -1300,7 +1300,7 @@ static int demux_mkv_read_seekhead(demuxer_t *demuxer)
     uint64_t length, l, seek_pos, saved_pos, num;
     uint32_t seek_id;
     int i, il, res = 0;
-    off_t off;
+	quad_t off;
 
     off = stream_tell(s);
     for (i = 0; i < mkv_d->parsed_seekhead_num; i++)
@@ -1309,11 +1309,11 @@ static int demux_mkv_read_seekhead(demuxer_t *demuxer)
             return 0;
         }
     if (mkv_d->parsed_seekhead_num >= INT_MAX ||
-        mkv_d->parsed_seekhead_num > SIZE_MAX/sizeof(off_t))
+		mkv_d->parsed_seekhead_num > SIZE_MAX/sizeof(quad_t))
         return 0;
     mkv_d->parsed_seekhead = realloc(mkv_d->parsed_seekhead,
                                      (mkv_d->parsed_seekhead_num + 1)
-                                     * sizeof(off_t));
+									 * sizeof(quad_t));
     mkv_d->parsed_seekhead[mkv_d->parsed_seekhead_num++] = off;
 
     mp_msg(MSGT_DEMUX, MSGL_V,
@@ -2015,8 +2015,8 @@ static int demux_mkv_open(demuxer_t *demuxer)
     demuxer->priv = mkv_d;
     mkv_d->tc_scale = 1000000;
     mkv_d->segment_start = stream_tell(s);
-    mkv_d->parsed_cues = malloc(sizeof(off_t));
-    mkv_d->parsed_seekhead = malloc(sizeof(off_t));
+	mkv_d->parsed_cues = malloc(sizeof(quad_t));
+	mkv_d->parsed_seekhead = malloc(sizeof(quad_t));
 
     while (!cont) {
         switch (ebml_read_id(s, NULL)) {
@@ -2844,12 +2844,12 @@ static void demux_mkv_seek(demuxer_t *demuxer, float rel_seek_secs,
             max_pos = mkv_d->num_cluster_pos ?
                 mkv_d->cluster_positions[mkv_d->num_cluster_pos - 1] : 0;
             if (target_filepos > max_pos) {
-                if ((off_t) max_pos > stream_tell(s))
+				if ((quad_t) max_pos > stream_tell(s))
                     stream_seek(s, max_pos);
                 else
                     stream_seek(s, stream_tell(s) + mkv_d->cluster_size);
                 /* parse all the clusters upto target_filepos */
-                while (!s->eof && stream_tell(s) < (off_t) target_filepos) {
+				while (!s->eof && stream_tell(s) < (quad_t) target_filepos) {
                     switch (ebml_read_id(s, &i)) {
                     case MATROSKA_ID_CLUSTER:
                         add_cluster_position(mkv_d,

@@ -36,6 +36,10 @@
 #include "m_config.h"
 #include "parser-mecmd.h"
 
+#ifdef __MORPHOS__
+extern void mencoder_exit(int level, const char *how);
+#endif
+
 void
 m_entry_list_free(m_entry_t* lst) {
   int i,j;
@@ -156,7 +160,7 @@ m_config_parse_me_command_line(m_config_t *config, int argc, char **argv)
   }
 
   if (opt_exit)
-    exit(0);
+	mencoder_exit(0, NULL);
   if(nf == 0) {
     m_entry_list_free(lst);
     mp_msg(MSGT_CFGPARSER, MSGL_ERR, MSGTR_NoFileGiven);

@@ -22,6 +22,10 @@
 #include "input/mouse.h"
 #include "mp_fifo.h"
 
+#ifdef __MORPHOS__
+#include <proto/intuition.h>
+#endif
+
 int key_fifo_size = 7;
 static int *key_fifo_data;
 static unsigned key_fifo_read;
@@ -92,6 +96,7 @@ void mplayer_put_key(int code) {
     last_key[0] = code;
     last_key_time[1] = last_key_time[0];
     last_key_time[0] = now;
+/*
     if (last_key[1] == code &&
         now - last_key_time[1] < doubleclick_time)
       put_double(code);
@@ -100,4 +105,15 @@ void mplayer_put_key(int code) {
   if (last_key[0] == code && last_key[1] == code &&
       now - last_key_time[1] < doubleclick_time)
     put_double(code);
+*/
+/* __MORPHOS */
+	if (last_key[1] == code &&
+		DoubleClick(last_key_time[1]/1000, (last_key_time[1]%1000)*1000, now/1000, (now%1000)*1000)  )
+	  put_double(code);
+	return;
+  }
+
+  if (last_key[0] == code && last_key[1] == code &&
+	  DoubleClick(last_key_time[1]/1000, (last_key_time[1]%1000)*1000, now/1000, (now%1000)*1000)  )
+	put_double(code);
 }

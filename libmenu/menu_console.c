@@ -44,6 +44,10 @@
 #include "input/input.h"
 #include "osdep/timer.h"
 
+#ifdef __MORPHOS__
+#include <proto/dos.h>
+#endif
+
 typedef struct history_st history_t;
 
 struct history_st {
@@ -239,7 +243,7 @@ static void draw(menu_t* menu, mp_image_t* mpi) {
 }
 
 static void check_child(menu_t* menu) {
-#ifndef __MINGW32__
+#if !defined(__MINGW32__) && !defined(__MORPHOS__)
   fd_set rfd;
   struct timeval tv;
   int max_fd = mpriv->child_fd[2] > mpriv->child_fd[1] ? mpriv->child_fd[2] :
@@ -293,7 +297,33 @@ static void check_child(menu_t* menu) {
 #define close_pipe(pipe) close(pipe[0]); close(pipe[1])
 
 static int run_shell_cmd(menu_t* menu, char* cmd) {
-#ifndef __MINGW32__
+#if defined(__MORPHOS__)
+  BPTR out;
+
+  mp_msg(MSGT_GLOBAL,MSGL_INFO,MSGTR_LIBMENU_ConsoleRun,cmd);
+
+  out = Open("T:mplayer_cmd_output", MODE_NEWFILE);
+
+  Execute(cmd, NULL, out ? out : Output());
+
+  if(out)
+  {
+	char line[1024];
+
+	Close(out);
+	out = Open("T:mplayer_cmd_output", MODE_OLDFILE);
+
+	if(out)
+	{
+		while(FGets(out, line, sizeof(line)))
+		{
+			add_line(mpriv,line);
+		}
+		Close(out);
+	}
+	DeleteFile("T:mplayer_cmd_output");
+  }
+#elif !defined(__MINGW32__)
   int in[2],out[2],err[2];
 
   mp_msg(MSGT_GLOBAL,MSGL_INFO,MSGTR_LIBMENU_ConsoleRun,cmd);
@@ -396,7 +426,35 @@ static void read_cmd(menu_t* menu,int cmd) {
     c = mp_input_parse_cmd(mpriv->cur_history->buffer);
     enter_cmd(menu);
     if(!c)
-      add_line(mpriv,"Invalid command try help");
+	{
+#ifdef __MORPHOS__
+		char * ptr;
+		if((ptr=strchr(mpriv->cur_history->prev->buffer, ' ')))
+		{
+		  BPTR lock;
+		  char buffer[512];
+		  char command[256];
+		  strncpy(command, mpriv->cur_history->prev->buffer, ptr - mpriv->cur_history->prev->buffer);
+		  command[ptr - mpriv->cur_history->prev->buffer] = 0;
+
+		  lock = GetProgramDir();
+		  if(lock)
+		  {
+			char progdir[256];
+			if(NameFromLock(lock, progdir, sizeof(progdir)))
+			{
+				char script[256];
+				snprintf(script, sizeof(script), "conf/%s.rexx", command);
+				AddPart(progdir, script, sizeof(progdir));
+				snprintf(buffer, sizeof(buffer), "rx %s \"%s\"", progdir, ptr+1);
+				run_shell_cmd(menu, buffer);
+			}
+		  }
+		}
+		else
+#endif
+		  add_line(mpriv,"Invalid command try help");
+	}
     else {
       switch(c->id) {
       case MP_CMD_CHELP:
@@ -404,6 +462,8 @@ static void read_cmd(menu_t* menu,int cmd) {
 	add_line(mpriv,"TODO: meaningful help message ;)");
 	add_line(mpriv,"Enter any slave command");
 	add_line(mpriv,"exit close this console");
+	// __ MORPHOS__ ok, just for fun
+	run_shell_cmd(menu, "run >nil: c:openurl http://www.mplayerhq.hu/DOCS/tech/slave.txt");
 	break;
       case MP_CMD_CEXIT:
 	menu->show = 0;
@@ -420,8 +480,8 @@ static void read_cmd(menu_t* menu,int cmd) {
 	run_shell_cmd(menu,c->args[0].v.s);
 	break;
       default: // Send the other commands to mplayer
-	mp_input_queue_cmd(c);
-      }
+		  mp_input_queue_cmd(c);
+	  }
     }
     return;
   }

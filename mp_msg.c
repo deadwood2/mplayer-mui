@@ -29,6 +29,17 @@
 #include <errno.h>
 #endif
 
+#ifdef __MORPHOS__
+#include "morphos_stuff.h"
+#endif
+
+#if defined(FOR_MENCODER)
+#undef CONFIG_GUI
+int use_gui;
+#else
+#include "gui/interface.h"
+#endif
+
 #include "mp_msg.h"
 
 /* maximum message length of mp_msg */
@@ -48,7 +59,7 @@ static iconv_t msgiconv;
 const char* filename_recode(const char* filename)
 {
 #if !defined(CONFIG_ICONV) || !defined(MSG_CHARSET)
-    return filename;
+	return filename;
 #else
     static iconv_t inv_msgiconv = (iconv_t)(-1);
     static char recoded_filename[MSGSIZE_MAX];
@@ -196,8 +207,15 @@ void mp_msg_va(int mod, int lev, const char *format, va_list va){
     tmp[MSGSIZE_MAX-2] = '\n';
     tmp[MSGSIZE_MAX-1] = 0;
 
+#if MPLAYER
+#ifdef CONFIG_GUI
+    if(use_gui)
+		gmp_msg(mod, lev, tmp);
+#endif
+#endif
+
 #if defined(CONFIG_ICONV) && defined(MSG_CHARSET)
-    if (mp_msg_charset && strcasecmp(mp_msg_charset, "noconv")) {
+	if (mp_msg_charset && strcasecmp(mp_msg_charset, "noconv")) { // __MORPHOS__
       char tmp2[MSGSIZE_MAX];
       size_t inlen = strlen(tmp), outlen = MSGSIZE_MAX;
       char *in = tmp, *out = tmp2;

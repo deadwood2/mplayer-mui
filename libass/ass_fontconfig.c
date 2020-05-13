@@ -173,6 +173,7 @@ static char *select_font(ASS_Library *library, FCInstance *priv,
     FcPatternAddBool(pat, FC_OUTLINE, FcTrue);
     FcPatternAddInteger(pat, FC_SLANT, italic);
     FcPatternAddInteger(pat, FC_WEIGHT, bold);
+//	  FcPatternAddString(pat, FC_LANG, NULL);  // __MORPHOS__ fix
 
     FcDefaultSubstitute(pat);
 
@@ -186,6 +187,11 @@ static char *select_font(ASS_Library *library, FCInstance *priv,
         goto error;
 
     fset = FcFontSetCreate();
+
+// __ MORPHOS__ fix
+	if(!fset)
+		goto error;
+
     for (curf = 0; curf < ffullname->nfont; ++curf) {
         FcPattern *curp = ffullname->fonts[curf];
         FcPatternReference(curp);
@@ -197,8 +203,8 @@ static char *select_font(ASS_Library *library, FCInstance *priv,
         FcFontSetAdd(fset, curp);
     }
 
-    for (curf = 0; curf < fset->nfont; ++curf) {
-        FcPattern *curp = fset->fonts[curf];
+	for (curf = 0; curf < fset->nfont; ++curf) {
+		FcPattern *curp = fset->fonts[curf];
 
         result = FcPatternGetBool(curp, FC_OUTLINE, 0, &r_outline);
         if (result != FcResultMatch)

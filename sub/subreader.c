@@ -1904,9 +1904,18 @@ static int compare_sub_priority(const void *a, const void *b)
     } else if (((const subfn*)a)->priority < ((const subfn*)b)->priority) {
 	return 1;
     } else {
+#ifdef __MORPHOS__
+	return strcmp(((subfn*)a)->fname, ((subfn*)b)->fname);
+#else
 	return strcoll(((const subfn*)a)->fname, ((const subfn*)b)->fname);
+#endif
     }
 }
+
+#ifdef __MORPHOS__
+#include <proto/dos.h>
+#include <dos/dos.h>
+#endif
 
 struct sub_list {
     struct subfn *subs;
@@ -2014,7 +2023,7 @@ static void append_dir_subtitles(struct sub_list *slist, const char *path,
                         prio = 5;
                     }
                 }
-                if (!prio && strcmp(tmp_fname_trim, f_fname_trim) == 0) {
+				if (!prio && strcasecmp(tmp_fname_trim, f_fname_trim) == 0) { //__MORPHOS__: ignore case
                     // matches the movie name
                     prio = 4;
                 }

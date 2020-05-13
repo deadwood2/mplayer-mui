@@ -35,6 +35,7 @@
 #include <assert.h>
 #endif
 #include "mp_fifo.h"
+#include "mp_core.h"
 #include "osdep/getch2.h"
 #include "osdep/keycodes.h"
 #include "osdep/timer.h"
@@ -179,6 +180,18 @@ static const mp_cmd_t mp_cmds[] = {
   { MP_CMD_TV_TELETEXT_GO_LINK, "teletext_go_link", 1, { {MP_CMD_ARG_INT,{0}}, {-1,{0}} } },
   { MP_CMD_OVERLAY_ADD, "overlay_add", 5, { {MP_CMD_ARG_STRING,{0}}, {MP_CMD_ARG_INT,{0}}, {MP_CMD_ARG_INT,{0}}, {MP_CMD_ARG_INT,{0}}, {MP_CMD_ARG_INT,{0}}, {-1,{0}} } },
   { MP_CMD_OVERLAY_REMOVE, "overlay_remove", 1, { {MP_CMD_ARG_INT,{0}}, {-1,{0}} } },
+
+#ifdef CONFIG_GUI
+  { MP_CMD_GUI_LOADFILE, "gui_loadfile", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_LOADSUBTITLE, "gui_loadsubtitle", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_ABOUT, "gui_about", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_PLAY, "gui_play", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_STOP, "gui_stop", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_PLAYLIST, "gui_playlist", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_PREFERENCES, "gui_preferences", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_SKINBROWSER, "gui_skinbrowser", 0, { {-1,{0}} } },
+  { MP_CMD_GUI_HIDE, "gui_hide", 0, { {-1,{0}} } }, // __MORPHOS__
+#endif
 
 #ifdef CONFIG_DVDNAV
   { MP_CMD_DVDNAV, "dvdnav", 1, { {MP_CMD_ARG_STRING, {0}}, {-1,{0}} } },
@@ -1871,7 +1884,7 @@ static int mp_input_print_key_list(m_option_t* cfg) {
   printf("\n");
   for(i= 0; key_names[i].name != NULL ; i++)
     printf("%s\n",key_names[i].name);
-  exit(0);
+  exit_player_with_rc(EXIT_QUIT, 0);
 }
 
 static int mp_input_print_cmd_list(m_option_t* cfg) {
@@ -1902,7 +1915,7 @@ static int mp_input_print_cmd_list(m_option_t* cfg) {
     }
     printf("\n");
   }
-  exit(0);
+  exit_player_with_rc(EXIT_QUIT, 0);
 }
 
 /**

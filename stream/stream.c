@@ -16,6 +16,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -75,6 +76,11 @@ extern const stream_info_t stream_info_smb;
 extern const stream_info_t stream_info_sdp;
 extern const stream_info_t stream_info_rtsp_sip;
 
+#ifdef __MORPHOS__
+extern stream_info_t stream_info_asyncio;
+extern stream_info_t stream_info_vcd_morphos;
+#endif
+
 extern const stream_info_t stream_info_cue;
 extern const stream_info_t stream_info_null;
 extern const stream_info_t stream_info_mf;
@@ -87,8 +93,17 @@ extern const stream_info_t stream_info_bluray;
 static const stream_info_t* const auto_open_streams[] = {
   &stream_info_bd,
 #ifdef CONFIG_VCD
+#ifdef __MORPHOS__
+  &stream_info_vcd_morphos,
+#else
   &stream_info_vcd,
 #endif
+#endif
+
+#ifdef __MORPHOS__
+//	&stream_info_asyncio,
+#endif
+
 #ifdef CONFIG_CDDA
   &stream_info_cdda,
 #endif
@@ -365,7 +380,7 @@ int stream_write_buffer(stream_t *s, unsigned char *buf, int len) {
   return rd;
 }
 
-int stream_seek_internal(stream_t *s, off_t newpos)
+int stream_seek_internal(stream_t *s, quad_t newpos)
 {
 if(newpos==0 || newpos!=s->pos){
   switch(s->type){
@@ -413,9 +428,9 @@ if(newpos==0 || newpos!=s->pos){
   return -1;
 }
 
-int stream_seek_long(stream_t *s,off_t pos){
+int stream_seek_long(stream_t *s,quad_t pos){
   int res;
-off_t newpos=0;
+quad_t newpos=0;
 
 //  if( mp_msg_test(MSGT_STREAM,MSGL_DBG3) ) printf("seek_long to 0x%X\n",(unsigned int)pos);
 
@@ -430,7 +445,7 @@ off_t newpos=0;
   if(s->sector_size)
       newpos = (pos/s->sector_size)*s->sector_size;
   else
-      newpos = pos&(~((off_t)STREAM_BUFFER_SIZE-1));
+	  newpos = pos&(~((quad_t)STREAM_BUFFER_SIZE-1));
 
 if( mp_msg_test(MSGT_STREAM,MSGL_DBG3) ){
   mp_msg(MSGT_STREAM,MSGL_DBG3, "s->pos=%"PRIX64"  newpos=%"PRIX64"  new_bufpos=%"PRIX64"  buflen=%X  \n",
@@ -528,7 +543,6 @@ void free_stream(stream_t *s){
     fclose(s->capture_file);
     s->capture_file = NULL;
   }
-
   if(s->close) s->close(s);
   if(s->fd>0){
     /* on unix we define closesocket to close

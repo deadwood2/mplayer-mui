@@ -33,6 +33,10 @@
 #include <ws2tcpip.h>
 #endif
 
+#if defined(__AROS__)
+#define atoll(x) atol(x)
+#endif
+
 #include "http.h"
 #include "url.h"
 #include "mp_msg.h"
@@ -43,6 +47,16 @@
 #include "help_mp.h"
 
 #include "libavutil/base64.h"
+
+#include "morphos_stuff.h"
+
+#if MPLAYER
+#ifdef CONFIG_GUI
+#include "gui/interface.h"
+#include "gui/morphos/gui.h"
+extern int use_gui;
+#endif
+#endif
 
 typedef struct {
   unsigned metaint;
@@ -133,6 +147,14 @@ static void scast_meta_read(int fd, streaming_ctrl_t *sc) {
       if (info[i] && info[i] < 32) info[i] = '?';
     info[nlen] = 0;
     mp_msg(MSGT_DEMUXER, MSGL_INFO, "\nICY Info: %s\n", info);
+#if MPLAYER
+#ifdef CONFIG_GUI
+	if(use_gui)
+	{
+		guiUpdateICY(info);
+	}
+#endif
+#endif
     free(info);
   }
 }

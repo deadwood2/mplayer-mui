@@ -57,7 +57,9 @@ udp_open_socket (URL_t *url)
   socklen_t err_len;
   fd_set set;
   struct sockaddr_in server_address;
+#if !defined(__AROS__)
   struct ip_mreq mcast;
+#endif
   struct timeval tv;
   struct hostent *hp;
   int reuse=reuse_socket;
@@ -93,11 +95,19 @@ udp_open_socket (URL_t *url)
   else
   {
 #if HAVE_INET_PTON
-    inet_pton (AF_INET, url->hostname, &server_address.sin_addr);
+	    inet_pton (AF_INET, url->hostname, &server_address.sin_addr);
 #elif HAVE_INET_ATON
     inet_aton (url->hostname, &server_address.sin_addr);
 #elif !HAVE_WINSOCK2_H
     server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+#elif defined(__MORPHOS__)
+	{
+		long addr = inet_addr(url->hostname);
+		if (addr != INADDR_NONE)
+		{
+			memcpy(&server_address.sin_addr, &addr, sizeof(addr));
+		}
+	}
 #endif
   }
   server_address.sin_family = AF_INET;
@@ -153,11 +163,15 @@ udp_open_socket (URL_t *url)
 
   if ((ntohl (server_address.sin_addr.s_addr) >> 28) == 0xe)
   {
+#ifdef __AROS__
+    if(1)
+#else
     mcast.imr_multiaddr.s_addr = server_address.sin_addr.s_addr;
     mcast.imr_interface.s_addr = 0;
 
     if (setsockopt (socket_server_fd, IPPROTO_IP,
                     IP_ADD_MEMBERSHIP, &mcast, sizeof (mcast)))
+#endif
     {
       mp_msg (MSGT_NETWORK, MSGL_ERR, "IP_ADD_MEMBERSHIP failed (do you have multicasting enabled in your kernel?)\n");
       closesocket (socket_server_fd);

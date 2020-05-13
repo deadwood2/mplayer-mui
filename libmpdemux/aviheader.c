@@ -48,8 +48,8 @@ static int odml_get_vstream_id(int id, unsigned char res[])
 
 static int avi_idx_cmp(const void *elem1, const void *elem2)
 {
-  register off_t a = AVI_IDX_OFFSET((AVIINDEXENTRY *)elem1);
-  register off_t b = AVI_IDX_OFFSET((AVIINDEXENTRY *)elem2);
+  register quad_t a = AVI_IDX_OFFSET((AVIINDEXENTRY *)elem1);
+  register quad_t b = AVI_IDX_OFFSET((AVIINDEXENTRY *)elem2);
   return (a > b) - (b > a);
 }
 
@@ -60,7 +60,7 @@ int stream_id=-1;
 int idxfix_videostream=0;
 int idxfix_divx=0;
 avi_priv_t* priv=demuxer->priv;
-off_t list_end=0;
+quad_t list_end=0;
 
 //---- AVI header:
 priv->idx_size=0;
@@ -488,7 +488,7 @@ if (priv->isodml && (index_mode==-1 || index_mode==0 || index_mode==1)) {
 	for (j=0; j<cx->nEntriesInUse; j++) {
 	    int ret1, ret2;
 	    memset(&cx->stdidx[j], 0, 32);
-	    ret1 = stream_seek(demuxer->stream, (off_t)cx->aIndex[j].qwOffset);
+	    ret1 = stream_seek(demuxer->stream, (quad_t)cx->aIndex[j].qwOffset);
 	    ret2 = stream_read(demuxer->stream, (char *)&cx->stdidx[j], 32);
 	    if (ret1 != 1 || ret2 != 32 || cx->stdidx[j].nEntriesInUse==0) {
 		// this is a broken file (probably incomplete) let the standard
@@ -642,7 +642,7 @@ if(index_mode>=2 || (priv->idx_size==0 && index_mode==1)){
   while(1){
     int id;
     unsigned len;
-    off_t skip;
+    quad_t skip;
     AVIINDEXENTRY* idx;
     unsigned int c;
     demuxer->filepos=stream_tell(demuxer->stream);
@@ -684,9 +684,9 @@ if(index_mode>=2 || (priv->idx_size==0 && index_mode==1)){
       }
 
     // update status line:
-    { static off_t lastpos;
-      off_t pos;
-      off_t len=demuxer->movi_end-demuxer->movi_start;
+    { static quad_t lastpos;
+      quad_t pos;
+      quad_t len=demuxer->movi_end-demuxer->movi_start;
       if(len){
           pos=100*(demuxer->filepos-demuxer->movi_start)/len; // %
       } else {

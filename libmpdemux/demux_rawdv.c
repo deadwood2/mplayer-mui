@@ -43,7 +43,7 @@ typedef struct
 {
    int current_frame;
    int frame_size;
-   off_t current_filepos;
+   quad_t current_filepos;
    int frame_number;
    dv_decoder_t *decoder;
 } rawdv_frames_t;
@@ -52,7 +52,7 @@ static void demux_seek_rawdv(demuxer_t *demuxer,float rel_seek_secs,float audio_
 {
    rawdv_frames_t *frames = (rawdv_frames_t *)demuxer->priv;
    sh_video_t *sh_video = demuxer->video->sh;
-   off_t newpos=(flags&SEEK_ABSOLUTE)?0:frames->current_frame;
+   quad_t newpos=(flags&SEEK_ABSOLUTE)?0:frames->current_frame;
    if(flags&SEEK_FACTOR)
    {
       // float 0..1

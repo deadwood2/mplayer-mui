@@ -59,8 +59,8 @@ typedef struct {
 // to set/get/query special features/parameters
 static int control(sh_video_t *sh,int cmd,void* arg,...){
     vd_libmpeg2_ctx_t *context = sh->context;
-    mpeg2dec_t * mpeg2dec = context->mpeg2dec;
-    const mpeg2_info_t * info = mpeg2_info (mpeg2dec);
+	mpeg2dec_t * mpeg2dec = context->mpeg2dec;
+	const mpeg2_info_t * info = mpeg2_info (mpeg2dec);
 
     switch(cmd) {
     case VDCTRL_QUERY_FORMAT:

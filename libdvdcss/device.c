@@ -84,10 +84,26 @@
 /*****************************************************************************
  * Device reading prototypes
  *****************************************************************************/
+#ifdef __MORPHOS__
+#include <proto/exec.h>
+#include <proto/dos.h>
+
+#include <devices/trackdisk.h>
+#include <devices/scsidisk.h>
+
+extern struct Task * maintask;
+#define CURRENT_TASK (FindTask(NULL) == maintask) ? "[MAIN TASK]" : "[CACHE TASK]"
+
+static int amiga_open  ( dvdcss_t, char const * );
+static int amiga_seek  ( dvdcss_t, int );
+static int amiga_read  ( dvdcss_t, void *, int );
+static int amiga_readv ( dvdcss_t, struct iovec *, int );
+#else
 static int libc_open  ( dvdcss_t, char const * );
 static int libc_seek  ( dvdcss_t, int );
 static int libc_read  ( dvdcss_t, void *, int );
 static int libc_readv ( dvdcss_t, struct iovec *, int );
+#endif
 
 #ifdef WIN32
 static int win2k_open ( dvdcss_t, char const * );
@@ -124,6 +140,9 @@ int _dvdcss_use_ioctls( dvdcss_t dvdcss )
     {
         return 1;
     }
+#elif defined(__MORPHOS__)
+		// MorphOS supports ioctl :-) !!!!!!!!
+		return 1;
 #elif defined( SYS_OS2 )
     ULONG ulMode;
 
@@ -407,13 +426,23 @@ int _dvdcss_open ( dvdcss_t dvdcss )
     }
     else
 #endif
-    {
-        print_debug( dvdcss, "using libc for access" );
-        dvdcss->pf_seek  = libc_seek;
-        dvdcss->pf_read  = libc_read;
-        dvdcss->pf_readv = libc_readv;
-        return libc_open( dvdcss, psz_device );
-    }
+#ifdef __MORPHOS__
+   {
+		print_debug( dvdcss, "using Amiga-style for access" );
+		dvdcss->pf_seek  = amiga_seek;
+		dvdcss->pf_read  = amiga_read;
+		dvdcss->pf_readv = amiga_readv;
+		return amiga_open( dvdcss, psz_device );
+	}
+#else
+	{
+		print_debug( dvdcss, "using libc for access" );
+		dvdcss->pf_seek  = libc_seek;
+		dvdcss->pf_read  = libc_read;
+		dvdcss->pf_readv = libc_readv;
+		return libc_open( dvdcss, psz_device );
+	}
+#endif
 }
 
 #if !defined(WIN32) && !defined(SYS_OS2)
@@ -466,6 +495,27 @@ int _dvdcss_close ( dvdcss_t dvdcss )
     }
 
     return 0;
+#elif __MORPHOS__
+
+	if (dvdcss->DVD_BufPtr)
+	{
+		WaitIO((struct IORequest *)dvdcss->DVD_IOReq);
+		free(dvdcss->DVD_BufPtr);
+		dvdcss->DVD_BufPtr = NULL;
+	}
+	if (dvdcss->DVD_IOReq)
+	{
+		CloseDevice( (struct IORequest *) dvdcss->DVD_IOReq);
+		DeleteIORequest( (struct IORequest *) dvdcss->DVD_IOReq);
+		dvdcss->DVD_IOReq = NULL;
+	}
+	if (dvdcss->DVD_MsgPort)
+	{
+		DeleteMsgPort(dvdcss->DVD_MsgPort);
+		dvdcss->DVD_MsgPort = NULL;
+	}
+
+	return 0;
 #else
     close( dvdcss->i_fd );
 
@@ -1087,4 +1137,261 @@ static int aspi_read_internal( int i_fd, void *p_data, int i_blocks )
     return i_blocks;
 }
 #endif
+
+/*****************************************************/
+/*****************************************************/
+/*****************************************************/
+/*              MorphOS/AmigaOS section              */
+/*****************************************************/
+/*****************************************************/
+/*****************************************************/
+#ifdef __MORPHOS__
+#include "../stream/amiga_scsi.h"
+
+struct MySCSICmd
+{
+		struct SCSICmd req;
+		SCSICMD12 cmd;
+};
+
+static BOOL DiskPresent(struct IOStdReq *My_IOStdReq);
+static BOOL read_sector (struct IOStdReq *My_IOStdReq, ULONG start_block, ULONG block_count, UBYTE *Data, struct MySCSICmd *MySCSI, BOOL sync);
+static UBYTE Global_SCSISense[SENSE_LEN];
+
+/*******************/
+//return 0 -> ok , -1 -> error
+
+dvdcss_t gdvdcss;
+char gname[255];
+int g_opened = 0;
+
+
+void gdvdcss_open(void)
+{
+//	  kprintf("%s gdvdcss_open\n", CURRENT_TASK);
+
+	/* Wait that main context closes device before opening it again in this cache context */
+	while(g_opened)
+	{
+		Delay(10);
+	}
+
+//	  kprintf("ok\n");
+
+	amiga_open(gdvdcss, gname);
+}
+
+void gdvdcss_close(void)
+{
+//	  kprintf("%s gdvdcss_close\n", CURRENT_TASK);
+
+	if(gdvdcss) // Can be called for !css streams from cache
+	{
+		if (gdvdcss->DVD_BufPtr)
+		{
+			WaitIO((struct IORequest *)gdvdcss->DVD_IOReq);
+			free(gdvdcss->DVD_BufPtr);
+			gdvdcss->DVD_BufPtr = NULL;
+		}
+		if (gdvdcss->DVD_IOReq)
+		{
+			CloseDevice( (struct IORequest *) gdvdcss->DVD_IOReq);
+			DeleteIORequest( (struct IORequest *) gdvdcss->DVD_IOReq);
+			gdvdcss->DVD_IOReq = NULL;
+		}
+		if (gdvdcss->DVD_MsgPort)
+		{
+			DeleteMsgPort(gdvdcss->DVD_MsgPort);
+			gdvdcss->DVD_MsgPort = NULL;
+		}
+	}
+
+//	  kprintf("ok\n");
+
+	g_opened = 0;
+}
+
+
+static int amiga_open  ( dvdcss_t My_dvdcss, char const * device_name)
+{
+		ULONG dvd_unit;
+		TEXT dvd_device[64];
+		BYTE My_Device=-1;
+		struct MsgPort    *My_MsgPort = NULL;
+		struct IOStdReq   *My_IOReq = NULL;
+		UBYTE *My_Buffer = NULL;
+
+		strcpy(gname, device_name);
+		gdvdcss = My_dvdcss;
+
+		if(!gdvdcss) return -1;
+
+//		  kprintf("%s amiga_open %s\n", CURRENT_TASK, device_name);
+
+		if ( ! (My_MsgPort = CreateMsgPort() ) ) goto fail;
+
+		if ( ! (My_IOReq = (struct IOStdReq *) CreateIORequest(My_MsgPort, sizeof(struct IOStdReq) ) ) ) goto fail;
+
+		if ( ! (My_Buffer = malloc(sizeof(struct MySCSICmd) + DVDCSS_BLOCK_SIZE + 31) ) ) goto fail;
+		{
+			char *temp = strchr(device_name, ':');
+
+			if (!temp) goto fail;
+			dvd_unit = atoi(temp+1);
+			stccpy(dvd_device, device_name, temp - device_name + 1);
+		}
+
+		if ( ( My_Device = OpenDevice(dvd_device, dvd_unit, (struct IORequest *) My_IOReq, 0L) ) ) goto fail;
+
+		if ( !DiskPresent( My_IOReq ) ) {
+			//kprintf("No DVD present, go away !\n");
+			goto fail;
+		}
+
+		My_dvdcss->i_pos = 0;
+
+		My_dvdcss->DVD_IOReq    = My_IOReq;
+		My_dvdcss->i_fd			= (int) My_IOReq;
+		My_dvdcss->DVD_MsgPort  = My_MsgPort;
+
+		My_dvdcss->DVD_BufPtr = My_Buffer;
+		My_dvdcss->DVD_Buffer = (APTR)((((IPTR)My_Buffer) + sizeof(struct MySCSICmd) + 31) & ~31);
+
+		read_sector(My_IOReq, 0, 1, My_dvdcss->DVD_Buffer, My_dvdcss->DVD_BufPtr, 0);
+
+		g_opened = 1;
+
+//		  kprintf("amiga_open ok\n");
+
+		return 0;
+
+fail:
+//		  kprintf("amiga_open failed\n");
+		if (!My_Device)   CloseDevice( (struct IORequest *) My_IOReq);
+		if (My_IOReq)     DeleteIORequest( (struct IORequest *) My_IOReq);
+		if (My_MsgPort)   DeleteMsgPort(My_MsgPort);
+		if (My_Buffer)    free(My_Buffer);
+
+		My_dvdcss->DVD_IOReq = NULL;
+		My_dvdcss->DVD_MsgPort = NULL;
+		My_dvdcss->DVD_BufPtr = NULL;
+		My_dvdcss->DVD_Buffer = NULL;
+
+		return -1;
+}
+
+/*****************************************************/
+static int amiga_seek  ( dvdcss_t My_dvdcss, int blocks)
+{
+		//kprintf("%s amiga_seek %d\n", CURRENT_TASK, blocks);
+
+		if (My_dvdcss->i_pos != blocks)
+		{
+			WaitIO((struct IORequest *)My_dvdcss->DVD_IOReq);
+			//kprintf("ok\n");
+			My_dvdcss->i_pos = blocks;
+			read_sector(My_dvdcss->DVD_IOReq, blocks, 1, My_dvdcss->DVD_Buffer, My_dvdcss->DVD_BufPtr, 0);
+		}
+		return blocks;
+}
+
+/*****************************************************/
+static int amiga_read  ( dvdcss_t My_dvdcss, void *p_buffer, int blocks)
+{
+		//kprintf("%s amiga_read\n", CURRENT_TASK);
+
+		WaitIO((struct IORequest *)My_dvdcss->DVD_IOReq);
+		//kprintf("ok\n");
+
+		if (blocks == 1)
+		{
+			if (My_dvdcss->DVD_IOReq->io_Error)
+			{
+				My_dvdcss->i_pos = -1;
+				My_dvdcss->DVD_IOReq->io_Flags = IOF_QUICK;	/* Prevent WaitIO from doing bad things */
+				return -1;
+			}
+
+			CopyMemQuick(My_dvdcss->DVD_Buffer, p_buffer, DVDCSS_BLOCK_SIZE);
+
+			My_dvdcss->i_pos += 1;
+		} else
+		{
+			if ( !read_sector(My_dvdcss->DVD_IOReq, My_dvdcss->i_pos, blocks, p_buffer, My_dvdcss->DVD_BufPtr, 1) )
+			{
+				My_dvdcss->i_pos = -1;
+				return -1;
+			}
+
+			My_dvdcss->i_pos += blocks;
+		}
+
+		//printf("read_sector 2 status = %d\n", read_sector(My_dvdcss->DVD_IOReq, My_dvdcss->i_pos, 1, My_dvdcss->DVD_Buffer, My_dvdcss->DVD_BufPtr, 0));
+		read_sector(My_dvdcss->DVD_IOReq, My_dvdcss->i_pos, 1, My_dvdcss->DVD_Buffer, My_dvdcss->DVD_BufPtr, 0);
+
+		return blocks;
+}
+
+/*****************************************************/
+static int amiga_readv ( dvdcss_t My_dvdcss, struct iovec *p_iovec, int blocks)
+{
+		return 0;
+}
+
+/*****************************************************/
+static BOOL read_sector (struct IOStdReq *My_IOStdReq, ULONG start_block, ULONG block_count, UBYTE *Data, struct MySCSICmd *MySCSI, BOOL sync)
+{
+		//printf("read_sector (lowlevel)\n");
+
+		MySCSI->cmd.opcode = SCSI_CMD_READ_CD12;
+		MySCSI->cmd.b1 = 0;
+		MySCSI->cmd.b2 = start_block >> 24;
+		MySCSI->cmd.b3 = (start_block >> 16) & 0xFF;
+		MySCSI->cmd.b4 = (start_block >> 8) & 0xFF;
+		MySCSI->cmd.b5 = start_block & 0xFF;
+
+		MySCSI->cmd.b6 = block_count >> 24;
+		MySCSI->cmd.b7 = (block_count >> 16) & 0xFF;
+		MySCSI->cmd.b8 = (block_count >> 8) & 0xFF;
+		MySCSI->cmd.b9 = block_count & 0xFF;
+
+		MySCSI->cmd.b10 = 0;
+		MySCSI->cmd.control = PAD;
+
+		My_IOStdReq->io_Command    = HD_SCSICMD;
+		My_IOStdReq->io_Data       = &MySCSI->req;
+		My_IOStdReq->io_Length     = sizeof(struct SCSICmd);
+
+		MySCSI->req.scsi_Data 			= (UWORD *) Data;
+		MySCSI->req.scsi_Length		= block_count * DVDCSS_BLOCK_SIZE;
+		MySCSI->req.scsi_SenseActual = 0;
+		MySCSI->req.scsi_SenseData	= Global_SCSISense;
+		MySCSI->req.scsi_SenseLength	= SENSE_LEN;
+		MySCSI->req.scsi_Command		= (UBYTE *) &MySCSI->cmd;
+		MySCSI->req.scsi_CmdLength	= sizeof(SCSICMD12);
+		MySCSI->req.scsi_Flags			= SCSIF_READ | SCSIF_AUTOSENSE;
+
+		if (sync)
+		{
+			DoIO((struct IORequest *)My_IOStdReq);
+			return My_IOStdReq->io_Error ? FALSE : TRUE;
+		}
+		else
+		{
+			SendIO((struct IORequest *)My_IOStdReq);
+			return TRUE;
+		}
+}
+/*****************************************************/
+static BOOL DiskPresent(struct IOStdReq *My_IOStdReq)
+{
+		My_IOStdReq->io_Command    = TD_CHANGESTATE;
+		My_IOStdReq->io_Flags      = 0;
+
+		DoIO( (struct IORequest *)My_IOStdReq );
+
+		return My_IOStdReq->io_Actual ? FALSE : TRUE;
+}
+
+#endif // __MORPHOS__
 

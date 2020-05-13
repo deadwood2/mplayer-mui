@@ -74,7 +74,7 @@ static int config(struct vf_instance *vf,
     vf->priv->dh = d_height;
     vf->priv->stride = (3*vf->priv->dw+15)&~15;
 
-    free(vf->priv->buffer); // probably reconfigured
+	if (vf->priv->buffer) av_free(vf->priv->buffer); // probably reconfigured
     vf->priv->buffer = NULL;
 
     return vf_next_config(vf,width,height,d_width,d_height,flags,outfmt);
@@ -109,18 +109,31 @@ static int fexists(char *fname)
     else return 0;
 }
 
+#ifdef __MORPHOS__
+extern char * filename;
+#include <proto/dos.h>
+#endif
+
 static void gen_fname(struct vf_priv_s* priv)
 {
-    do {
+	do {
+#ifdef __MORPHOS__
+	char buf[sizeof(priv->fname) - 13];
+	stccpy(buf, FilePart(filename), sizeof(buf));
+	snprintf (priv->fname, sizeof(priv->fname), "RAM:%s.%04d.png", buf, ++priv->frameno);
+#else
         snprintf (priv->fname, 100, "shot%04d.png", ++priv->frameno);
-    } while (fexists(priv->fname) && priv->frameno < 100000);
-    if (fexists(priv->fname)) {
+#endif
+	} while (fexists(priv->fname) && priv->frameno < 100000);
+	if (fexists(priv->fname)) {
         priv->fname[0] = '\0';
         return;
-    }
+	}
 
-    mp_msg(MSGT_VFILTER,MSGL_INFO,"*** screenshot '%s' ***\n",priv->fname);
-
+	mp_msg(MSGT_VFILTER,MSGL_INFO,"*** screenshot '%s' ***\n",priv->fname);
+#ifdef __MORPHOS__
+	mp_msg(MSGT_VFILTER,MSGL_STATUS,"Saved screenshot to '%s'\n",priv->fname);
+#endif
 }
 
 static void scale_image(struct vf_priv_s* priv, mp_image_t *mpi)
@@ -277,7 +290,7 @@ static void uninit(vf_instance_t *vf)
     avcodec_close(vf->priv->avctx);
     av_freep(&vf->priv->avctx);
     if(vf->priv->ctx) sws_freeContext(vf->priv->ctx);
-    av_free(vf->priv->buffer);
+    if (vf->priv->buffer) av_free(vf->priv->buffer);
     free(vf->priv->outbuffer);
     free(vf->priv);
 }
@@ -308,7 +321,6 @@ static int vf_open(vf_instance_t *vf, char *args)
     }
     return 1;
 }
-
 
 const vf_info_t vf_info_screenshot = {
     "screenshot to file",

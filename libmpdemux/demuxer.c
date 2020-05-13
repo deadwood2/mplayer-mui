@@ -557,7 +557,7 @@ static void get_parser(sh_common_t *sh, AVCodecContext **avctx, AVCodecParserCon
     sh->parser = *parser;
 }
 
-int ds_parse(demux_stream_t *ds, uint8_t **buffer, int *len, double pts, off_t pos)
+int ds_parse(demux_stream_t *ds, uint8_t **buffer, int *len, double pts, quad_t pos)
 {
     AVCodecContext *avctx;
     AVCodecParserContext *parser;
@@ -610,7 +610,7 @@ void ds_add_packet(demux_stream_t *ds, demux_packet_t *dp)
 }
 
 void ds_read_packet(demux_stream_t *ds, stream_t *stream, int len,
-                    double pts, off_t pos, int flags)
+					double pts, quad_t pos, int flags)
 {
     demux_packet_t *dp = new_demux_packet(len);
     if (!dp) return;
@@ -1498,7 +1498,7 @@ int demuxer_get_percent_pos(demuxer_t *demuxer)
     int res = demux_control(demuxer, DEMUXER_CTRL_GET_PERCENT_POS, &ans);
     int len = (demuxer->movi_end - demuxer->movi_start) / 100;
     if (res <= 0) {
-        off_t pos = demuxer->filepos > 0 ? demuxer->filepos : stream_tell(demuxer->stream);
+		quad_t pos = demuxer->filepos > 0 ? demuxer->filepos : stream_tell(demuxer->stream);
         if (len > 0)
             ans = (pos - demuxer->movi_start) / len;
         else

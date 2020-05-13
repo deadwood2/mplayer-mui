@@ -158,7 +158,13 @@ void get_screen_size(void){
 
 void getch2(void)
 {
-    int retval = read(0, &getch2_buf[getch2_len], BUF_LEN-getch2_len);
+	int retval;
+
+#ifdef __MORPHOS__
+	return;
+#endif
+	
+	retval = read(0, &getch2_buf[getch2_len], BUF_LEN-getch2_len);
     if (retval < 1)
         return;
     getch2_len += retval;
@@ -272,6 +278,9 @@ void getch2(void)
 static int getch2_status=0;
 
 void getch2_enable(void){
+#ifdef __MORPHOS__
+	return ;
+#endif
 #ifdef HAVE_TERMIOS
 struct termios tio_new;
     tcgetattr(0,&tio_orig);
@@ -285,6 +294,9 @@ struct termios tio_new;
 }
 
 void getch2_disable(void){
+#ifdef __MORPHOS__
+	return ;
+#endif
     if(!getch2_status) return; // already disabled / never enabled
 #ifdef HAVE_TERMIOS
     tcsetattr(0,TCSANOW,&tio_orig);
@@ -292,10 +304,12 @@ void getch2_disable(void){
     getch2_status=0;
 }
 
-#ifdef CONFIG_ICONV
+#define USE_ICONV
+#ifdef USE_ICONV
+//#ifdef CONFIG_ICONV
 char* get_term_charset(void)
 {
-    char* charset = NULL;
+	char* charset = NULL;
 #ifdef HAVE_LANGINFO
     setlocale(LC_CTYPE, "");
     charset = strdup(nl_langinfo(CODESET));

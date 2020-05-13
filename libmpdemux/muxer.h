@@ -44,7 +44,7 @@ typedef struct {
   int id;    // stream no
   uint32_t ckid; // chunk id (00dc 01wb etc)
   double timer;
-  off_t size;
+  quad_t size;
   float aspect; // aspect ratio of this stream (set by ve_*.c)
   // buffering:
   unsigned char *buffer;
@@ -87,9 +87,9 @@ typedef struct {
 typedef struct muxer_t{
   // encoding:
   MainAVIHeader avih;
-  off_t movi_start;
-  off_t movi_end;
-  off_t file_end; // for MPEG it's system timestamp in 1/90000 s
+  quad_t movi_start;
+  quad_t movi_end;
+  quad_t file_end; // for MPEG it's system timestamp in 1/90000 s
   float audio_delay_fix;
   // index:
   AVIINDEXENTRY *idx;

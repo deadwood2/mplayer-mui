@@ -155,7 +155,7 @@ static int readline(char *buf,int max,struct stream_priv_s *ctl)
         break;
       }
 
-      if ((x = recv(ctl->handle,ctl->cput,ctl->cleft,0)) == -1) {
+	  if ((x = recv(ctl->handle,ctl->cput,ctl->cleft,0)) == -1) {
 	mp_msg(MSGT_STREAM,MSGL_ERR, "[ftp] read error: %s\n",strerror(errno));
 	retval = -1;
 	break;
@@ -261,7 +261,7 @@ static int FtpOpenPort(struct stream_priv_s* p) {
   return fd;
 }
 
-static int FtpOpenData(stream_t* s,off_t newpos) {
+static int FtpOpenData(stream_t* s,quad_t newpos) {
   struct stream_priv_s* p = s->priv;
   int resp;
   char str[256],rsp_txt[256];
@@ -309,7 +309,7 @@ static int fill_buffer(stream_t *s, char* buffer, int max_len){
   return (r <= 0) ? -1 : r;
 }
 
-static int seek(stream_t *s,off_t newpos) {
+static int seek(stream_t *s,quad_t newpos) {
   struct stream_priv_s* p = s->priv;
   int resp;
   char rsp_txt[256];
@@ -381,6 +381,14 @@ static void close_f(stream_t *s) {
   free(p->buf);
 
   m_struct_free(&stream_opts,p);
+
+#ifdef __MORPHOS__
+	if(SocketBase)
+	{
+	  	CloseLibrary(SocketBase);
+		SocketBase = NULL;
+	}
+#endif
 }
 
 
@@ -390,6 +398,11 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
   int64_t len = 0;
   struct stream_priv_s* p = (struct stream_priv_s*)opts;
   char str[256],rsp_txt[256];
+
+#ifdef __MORPHOS__
+   if (!SocketBase)
+	  if ( ! (SocketBase = OpenLibrary("bsdsocket.library", 0L) ) ) return NULL;
+#endif
 
   if(mode != STREAM_READ) {
     mp_msg(MSGT_OPEN,MSGL_ERR, "[ftp] Unknown open mode %d\n",mode);

@@ -157,7 +157,7 @@ typedef struct {
 	uint16_t packet_size;
 	int is_dvd, is_xvcd, is_xsvcd, is_genmpeg1, is_genmpeg2, rawpes, ts_allframes, has_video, has_audio;
 	int update_system_header, use_psm;
-	off_t headers_size, data_size;
+	quad_t headers_size, data_size;
 	uint64_t scr;
 	uint64_t delta_scr;
 	uint64_t last_psm_scr;

@@ -38,6 +38,12 @@
 #include "help_mp.h"
 #include "stream_dvd_common.h"
 
+#ifdef __MORPHOS__
+#include <proto/dos.h>
+extern APTR OldWinPtr;
+extern struct Process *MyProcess;
+#endif
+
 /* state flags */
 typedef enum {
   NAV_FLAG_EOF                  = 1 << 0,  /* end of stream has been reached */
@@ -87,7 +93,7 @@ static const struct m_struct_st stream_opts = {
   stream_opts_fields
 };
 
-static int seek(stream_t *s, off_t newpos);
+static int seek(stream_t *s, quad_t newpos);
 static void show_audio_subs_languages(dvdnav_t *nav);
 
 static dvdnav_priv_t * new_dvdnav_stream(char * filename) {
@@ -276,7 +282,7 @@ static void update_title_len(stream_t *stream) {
 
   status = dvdnav_get_position(priv->dvdnav, &pos, &len);
   if(status == DVDNAV_STATUS_OK && len) {
-    stream->end_pos = (off_t) len * 2048;
+    stream->end_pos = (quad_t) len * 2048;
     stream->seek = seek;
   } else {
     stream->seek = NULL;
@@ -285,7 +291,7 @@ static void update_title_len(stream_t *stream) {
 }
 
 
-static int seek(stream_t *s, off_t newpos) {
+static int seek(stream_t *s, quad_t newpos) {
   uint32_t sector = 0;
   dvdnav_priv_t *priv = s->priv;
 
@@ -402,7 +408,7 @@ static int fill_buffer(stream_t *s, char *but, int len)
   return len;
 }
 
-static int mp_dvdnav_lang_from_sid(stream_t *stream, int sid);
+int mp_dvdnav_lang_from_sid(stream_t *stream, int sid);
 static int mp_dvdnav_lang_from_aid(stream_t *stream, int sid);
 
 static int control(stream_t *stream, int cmd, void* arg) {
@@ -610,11 +616,21 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
   char *filename;
   dvdnav_priv_t *priv;
 
-  if(p->device) filename = p->device;
-  else if(dvd_device) filename= dvd_device;
+#ifdef __MORPHOS__
+  /* Disable requesters */
+  OldWinPtr = MyProcess->pr_WindowPtr;
+  MyProcess->pr_WindowPtr = (APTR)-1;
+#endif
+
+  if(p->device) filename = p->device; 
+  else if(dvd_device) filename= dvd_device; 
   else filename = DEFAULT_DVD_DEVICE;
   if(!(priv=new_dvdnav_stream(filename))) {
     mp_msg(MSGT_OPEN,MSGL_ERR,MSGTR_CantOpenDVD,filename, strerror(errno));
+#ifdef __MORPHOS__
+	  /* Enable requesters */
+	  MyProcess->pr_WindowPtr = OldWinPtr;
+#endif
     return STREAM_UNSUPPORTED;
   }
 
@@ -622,6 +638,10 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
     priv->title = p->track;
     if(dvdnav_title_play(priv->dvdnav, p->track) != DVDNAV_STATUS_OK) {
       mp_msg(MSGT_OPEN,MSGL_FATAL,"dvdnav_stream, couldn't select title %d, error '%s'\n", p->track, dvdnav_err_to_string(priv->dvdnav));
+#ifdef __MORPHOS__
+	  /* Enable requesters */
+	  MyProcess->pr_WindowPtr = OldWinPtr;
+#endif
       return STREAM_UNSUPPORTED;
     }
     mp_msg(MSGT_IDENTIFY, MSGL_INFO, "ID_DVD_CURRENT_TITLE=%d\n", p->track);
@@ -651,6 +671,11 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
     mp_msg(MSGT_OPEN,MSGL_ERR, "INIT ERROR: couldn't get init pos %s\r\n", dvdnav_err_to_string(priv->dvdnav));
 
   mp_msg(MSGT_OPEN,MSGL_INFO, "Remember to disable MPlayer's cache when playing dvdnav:// streams (adding -nocache to your command line)\r\n");
+
+#ifdef __MORPHOS__
+	  /* Enable requesters */
+	  MyProcess->pr_WindowPtr = OldWinPtr;
+#endif
 
   return STREAM_OK;
 }
@@ -833,7 +858,7 @@ int mp_dvdnav_sid_from_lang(stream_t *stream, const unsigned char *language) {
  * \param sid: physical subtitle id
  * \return 0 on error, otherwise language id
  */
-static int mp_dvdnav_lang_from_sid(stream_t *stream, int sid) {
+int mp_dvdnav_lang_from_sid(stream_t *stream, int sid) {
     uint8_t k;
     uint16_t lang;
     dvdnav_priv_t *priv = stream->priv;

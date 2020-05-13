@@ -30,6 +30,8 @@
 #include <inttypes.h>
 #include <ctype.h>
 
+#define USE_ICONV
+
 #ifdef CONFIG_ICONV
 #include <iconv.h>
 #endif
@@ -960,10 +962,10 @@ void ass_flush_events(ASS_Track *track)
 static char *sub_recode(ASS_Library *library, char *data, size_t size,
                         char *codepage)
 {
-    iconv_t icdsc;
-    char *tocp = "UTF-8";
-    char *outbuf;
-    assert(codepage);
+	iconv_t icdsc = (iconv_t)(-1);
+	char* tocp = "UTF-8";
+	char* outbuf = NULL;
+	assert(codepage);
 
     {
         const char *cp_tmp = codepage;
@@ -983,14 +985,16 @@ static char *sub_recode(ASS_Library *library, char *data, size_t size,
             ass_msg(library, MSGL_ERR, "Error opening iconv descriptor");
     }
 
-    {
-        size_t osize = size;
-        size_t ileft = size;
-        size_t oleft = size - 1;
-        char *ip;
-        char *op;
-        size_t rc;
-        int clear = 0;
+// __MORPHOS__
+	if(icdsc != (iconv_t)(-1))
+	{
+		size_t osize = size;
+		size_t ileft = size;
+		size_t oleft = size - 1;
+		char* ip;
+		char* op;
+		size_t rc;
+		int clear = 0;
 
         outbuf = malloc(osize);
         ip = data;

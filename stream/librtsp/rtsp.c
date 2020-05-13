@@ -78,7 +78,7 @@ static int write_stream(int s, const char *buf, int len) {
 #else
       if ((timeout>0) && ((errno == EAGAIN) || (WSAGetLastError() == WSAEINPROGRESS))) {
 #endif
-        usec_sleep (1000000); timeout--;
+		usleep (1000000); timeout--; // __MORPHOS__
       } else
         return -1;
     }

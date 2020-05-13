@@ -21,6 +21,6 @@
 
 #include <sys/types.h>
 
-extern off_t ps_probe;
+extern quad_t ps_probe;
 
 #endif /* MPLAYER_DEMUX_MPG_H */

@@ -53,7 +53,16 @@ enum {
     GUI_SET_MIXER,
     GUI_SET_STATE,
     GUI_SET_STREAM,
-    GUI_SET_VIDEO
+	GUI_SET_VIDEO,
+	// __MORPHOS__ additions
+	GUI_SET_VALUES,
+	GUI_SET_FILE_FORMAT,
+	GUI_SET_AUDIO_ONLY,
+	GUI_SET_DVD,
+	GUI_SET_DEMUXER,
+	GUI_SET_WINDOW_PTR,
+	GUI_SHOW_PANEL,
+	GUI_LOAD_FILE,
 };
 
 //@{
@@ -90,14 +99,29 @@ enum {
     MPLAYER_SET_SUB_ENCODING
 };
 
+// __MORPHOS__
+#define guiSetFilename( s,n ) { gfree( (void **)s ); s=gstrdup( n ); }
+
+// __MORPHOS__                                                                                                                                 
+#define guiSetDF( s,d,n )                         \
+  {                                               \
+    int size = strlen( d ) + strlen( n ) + 5;     \
+    gfree( (void **)s );                          \
+    s=malloc( size );                             \
+    stccpy(s, d, size);                           \
+    AddPart(s, n, size);                          \
+  }
+
 typedef struct {
     MPContext *mpcontext;
     sh_video_t *sh_video;
     af_stream_t *afilter;
+	void *demuxer; // __MORPHOS__
 
     int VideoWindow;
     int VideoWidth;
     int VideoHeight;
+	float FPS; // __MORPHOS__
 
     int StreamType;
     int AudioChannels;

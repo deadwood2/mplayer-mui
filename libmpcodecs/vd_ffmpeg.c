@@ -23,6 +23,7 @@
 
 #include "config.h"
 #include "mp_msg.h"
+#include "mp_core.h"
 #include "help_mp.h"
 #include "av_opts.h"
 #include "av_helpers.h"
@@ -34,6 +35,8 @@
 #include "fmt-conversion.h"
 
 #include "vd_internal.h"
+
+#include "morphos_stuff.h"
 
 static const vd_info_t info = {
     "FFmpeg's libavcodec codec family",
@@ -153,6 +156,7 @@ static enum AVDiscard str2AVDiscard(char *str) {
 static int control(sh_video_t *sh, int cmd, void *arg, ...){
     vd_ffmpeg_ctx *ctx = sh->context;
     AVCodecContext *avctx = ctx->avctx;
+
     switch(cmd){
     case VDCTRL_QUERY_FORMAT:
     {
@@ -873,7 +877,12 @@ static mp_image_t *decode(sh_video_t *sh, void *data, int len, int flags){
 	    return NULL;    // skipped image
     }
 
-    if(init_vo(sh, avctx->pix_fmt) < 0) return NULL;
+	if(init_vo(sh,avctx->pix_fmt) < 0)
+#if MPLAYER
+	{ exit_player_with_rc(EXIT_ERROR, 1); }
+#else
+	return NULL;
+#endif
 
     if(dr1 && pic->opaque){
         mpi= (mp_image_t *)pic->opaque;

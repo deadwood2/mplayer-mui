@@ -835,7 +835,8 @@ play_tree_add_basepath(play_tree_t* pt, char* bp) {
     fl = strlen(pt->files[i]);
     // if we find a full unix path, url:// or X:\ at the beginning,
     // don't mangle it.
-    if(fl <= 0 || strstr(pt->files[i],"://") || (pt->files[i][0] == '/')
+	// __MORPHOS__
+    if(fl <= 0 || strstr(pt->files[i],"://") || strstr(pt->files[i],":") || (pt->files[i][0] == '/')
 #if HAVE_DOS_PATHS
                || (strstr(pt->files[i],":\\") == pt->files[i] + 1)
                // the X:/ format is allowed as well

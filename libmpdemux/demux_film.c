@@ -44,7 +44,7 @@
 
 typedef struct film_chunk_t
 {
-  off_t chunk_offset;
+  quad_t chunk_offset;
   int chunk_size;
   unsigned int syncinfo1;
   unsigned int syncinfo2;

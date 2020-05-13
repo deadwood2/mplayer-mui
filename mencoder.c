@@ -16,6 +16,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#ifdef __MORPHOS__
+#include "morphos_stuff.h"
+#include <proto/dos.h>
+#include <dos/dos.h>
+#endif
+
 #define VCODEC_COPY 0
 #define VCODEC_FRAMENO 1
 // real codecs:
@@ -103,6 +109,12 @@
 int vo_doublebuffering=0;
 int vo_directrendering=0;
 int vo_config_count=1;
+
+#ifdef __MORPHOS__
+extern int altivec_disabled;
+APTR OldWinPtr;
+struct Process *MyProcess;
+#endif
 
 //--------------------------
 
@@ -246,12 +258,16 @@ static int edl_seek_type; ///< When non-zero, frames are discarded instead of se
 
 
 /* FIXME */
-static void mencoder_exit(int level, const char *how)
+/*static*/ void mencoder_exit(int level, const char *how)
 {
     if (how)
 	mp_msg(MSGT_MENCODER, MSGL_INFO, MSGTR_ExitingHow, how);
     else
 	mp_msg(MSGT_MENCODER, MSGL_INFO, MSGTR_Exiting);
+
+#ifdef __MORPHOS__
+	MorphOS_Close();
+#endif
 
     exit(level);
 }
@@ -526,6 +542,7 @@ static int edl_seek(edl_record_ptr next_edl_record, demuxer_t *demuxer,
     return slowseek(next_edl_record->stop_sec, demuxer->video, d_audio, mux_a, frame_data, framecopy, 1);
 }
 
+char* filename=NULL;
 
 int main(int argc,char* argv[]){
 
@@ -563,7 +580,6 @@ double sub_offset=0;
 int did_seek=0;
 
 m_entry_t* filelist = NULL;
-char* filename=NULL;
 
 int decoded_frameno=0;
 int next_frameno=-1;
@@ -577,6 +593,12 @@ audio_encoding_params_t aparams;
 audio_encoder_t *aencoder = NULL;
 
 user_correct_pts = 0;
+
+#ifdef __MORPHOS__
+	// see morphos_stuff.c
+	MyProcess = (struct Process *)FindTask(NULL);
+	if (MorphOS_Open(argc, argv) < 0) mencoder_exit(1, NULL);
+#endif
 
   common_preinit();
 
@@ -1713,5 +1735,6 @@ if(sh_video){ uninit_video(sh_video);sh_video=NULL; }
 if(demuxer) free_demuxer(demuxer);
 if(stream) free_stream(stream); // kill cache thread
 
+mencoder_exit(interrupted, NULL);
 return interrupted;
 }

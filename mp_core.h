@@ -29,6 +29,7 @@
 #include "mixer.h"
 #include "libvo/video_out.h"
 #include "sub/subreader.h"
+#include "libmpcodecs/mp_image.h"
 
 // definitions used internally by the core player code
 

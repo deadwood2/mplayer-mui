@@ -120,7 +120,7 @@ void mpeg2_cpu_state_init (uint32_t accel)
 	mpeg2_cpu_state_restore = state_restore_mmx;
     }
 #endif
-#if ARCH_PPC
+#if ARCH_PPC && defined(HAVE_ALTIVEC)
     if (accel & MPEG2_ACCEL_PPC_ALTIVEC) {
 	mpeg2_cpu_state_save = state_save_altivec;
 	mpeg2_cpu_state_restore = state_restore_altivec;

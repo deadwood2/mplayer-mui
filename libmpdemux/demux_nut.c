@@ -51,7 +51,7 @@ static int mp_eof(void * h) {
 	return 0;
 }
 
-static off_t mp_seek(void * h, long long pos, int whence) {
+static quad_t mp_seek(void * h, long long pos, int whence) {
 	stream_t * stream = (stream_t*)h;
 
 	if (stream->end_pos < stream_tell(stream))

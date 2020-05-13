@@ -40,6 +40,8 @@
 #elif defined(__CYGWIN__)
 #include <windows.h>
 #include <sys/cygwin.h>
+#elif defined(__MORPHOS__)
+#include <proto/dos.h>
 #endif
 
 #include "osdep/osdep.h"
@@ -49,6 +51,9 @@ char *get_path(const char *filename){
 	char *buff;
 #ifdef __MINGW32__
 	static char *config_dir = "/mplayer";
+#elif defined(__MORPHOS__)
+	static char * const config_dir = "conf";
+	homedir = "PROGDIR:";
 #else
 	static char *config_dir = "/.mplayer";
 #endif
@@ -62,6 +67,7 @@ char *get_path(const char *filename){
 	char *bdl_url_path = NULL;
 #endif
 
+#ifndef __MORPHOS__
 	if ((homedir = getenv("MPLAYER_HOME")) != NULL)
 		config_dir = "";
 	else if ((homedir = getenv("HOME")) == NULL)
@@ -98,6 +104,7 @@ char *get_path(const char *filename){
     }
 #else
 	return NULL;
+#endif
 #endif
 	len = strlen(homedir) + strlen(config_dir) + 1;
 	if (filename == NULL) {
@@ -176,6 +183,10 @@ void set_path_env(void)
 }
 #endif /* (defined(__MINGW32__) || defined(__CYGWIN__)) && defined(CONFIG_WIN32DLL) */
 
+#ifdef __MORPHOS__
+#define BINARY_CODECS_PATH "PROGDIR:"
+#endif
+
 char *codec_path = BINARY_CODECS_PATH;
 
 static int needs_free = 0;
@@ -201,7 +212,7 @@ const char *mp_basename(const char *path)
 {
     char *s;
 
-#if HAVE_DOS_PATHS
+#if HAVE_DOS_PATHS || defined(__MORPHOS__)
     s = strrchr(path, '\\');
     if (s)
         path = s + 1;
@@ -223,12 +234,21 @@ const char *mp_basename(const char *path)
  */
 char *mp_dirname(const char *path)
 {
+#warning "implement me correctly"
     const char *base = mp_basename(path);
     size_t len = base - path;
     char *dirname;
 
     if (len == 0)
+	{
+#ifdef __MORPHOS__
+		char currentdir[1024];
+		GetCurrentDirName(currentdir, sizeof(currentdir));
+		return strdup(currentdir);
+#else
         return strdup("./");
+#endif
+	}
     dirname = malloc(len + 1);
     if (!dirname)
         return NULL;
@@ -251,8 +271,28 @@ char *mp_dirname(const char *path)
  */
 char *mp_path_join(const char *base, const char *path)
 {
-    char *ret, *tmp;
+#ifdef __MORPHOS__
+	char *ret, *tmp;
+	int len;
 
+	if(strstr(path, ":"))
+		return strdup(path);
+
+    ret = mp_dirname(base);
+    if (!ret)
+        return NULL;
+
+	len = strlen(ret) + strlen(path) + 2;
+	tmp = realloc(ret, len);
+    if (!tmp) {
+        free(ret);
+        return NULL;
+    }
+    ret = tmp;
+	AddPart(ret, path, len);
+    return ret;
+#else
+    char *ret, *tmp;
 #if HAVE_DOS_PATHS
     if ((path[0] && path[1] == ':') || path[0] == '\\' || path[0] == '/')
 #else
@@ -271,6 +311,7 @@ char *mp_path_join(const char *base, const char *path)
     ret = tmp;
     strcat(ret, path);
     return ret;
+#endif
 }
 
 /**
@@ -282,6 +323,17 @@ char *mp_path_join(const char *base, const char *path)
  */
 char *mp_dir_join(const char *dir, const char *append)
 {
+#ifdef __MORPHOS__
+    char *tmp, *ret;
+    size_t dirlen = strlen(dir);
+    size_t i      = dirlen - 1;
+
+	if(dirlen == 0 || strstr(dir, ":"))
+		return mp_path_join(dir, append);
+
+	ret = mp_path_join(dir, append);
+    return ret;
+#else
     char *tmp, *ret;
     size_t dirlen = strlen(dir);
     size_t i      = dirlen - 1;
@@ -302,4 +354,5 @@ char *mp_dir_join(const char *dir, const char *append)
     ret = mp_path_join(tmp, append);
     free(tmp);
     return ret;
+#endif
 }
