@@ -19,7 +19,7 @@
 #include <libraries/mui.h>
 #include <proto/muimaster.h>
 
-#define DEFCLASS(s) ULONG create_##s##class(void); \
+#define DEFCLASS(s) IPTR create_##s##class(void); \
 	APTR get##s##class(void); \
 	APTR get##s##classroot(void); \
 	void delete_##s##class(void)
@@ -239,240 +239,240 @@ enum {
 /* Method Structures */
 
 struct MP_MPlayer_OpenStream {
-	ULONG MethodID;
-	STRPTR url;
+	STACKED STACKED ULONG MethodID;
+	STACKED STRPTR url;
 };
 
 /* MPlayerApp */
 
 struct MP_MPlayerApp_DisposeWindow {
-	ULONG MethodID;
-	Object *obj;
+	STACKED STACKED ULONG MethodID;
+	STACKED Object *obj;
 };
 
 /* MPlayerGroup */
 
 struct MP_MPlayerGroup_Show {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_ShowStatus {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_ShowToolbar {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_ShowControl {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_ShowPanels {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_ShowChapterBrowser {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_ShowDVDBrowser {
-	ULONG MethodID;
-	ULONG show;
+	STACKED ULONG MethodID;
+	STACKED ULONG show;
 };
 
 struct MP_MPlayerGroup_SetTitle {
-	ULONG MethodID;
-	ULONG update;
+	STACKED ULONG MethodID;
+	STACKED ULONG update;
 };
 
 struct MP_MPlayerGroup_SetChapter {
-	ULONG MethodID;
-	ULONG update;
+	STACKED ULONG MethodID;
+	STACKED ULONG update;
 };
 
 struct MP_MPlayerGroup_SetAngle {
-	ULONG MethodID;
-	ULONG update;
+	STACKED ULONG MethodID;
+	STACKED ULONG update;
 };
 
 struct MP_MPlayerGroup_Open {
-	ULONG MethodID;
-	ULONG mode;
-	TEXT * url;
+	STACKED STACKED ULONG MethodID;
+	STACKED STACKED ULONG mode;
+	STACKED TEXT * url;
 };
 
 struct MP_MPlayerGroup_Seek {
-	ULONG MethodID;
-	ULONG mode;
-	ULONG value;
+	STACKED ULONG MethodID;
+	STACKED ULONG mode;
+	STACKED ULONG value;
 };
 
 struct MP_MPlayerGroup_Update {
-	ULONG MethodID;
-	ULONG mode;
-	APTR  data;
+	STACKED ULONG MethodID;
+	STACKED ULONG mode;
+	STACKED APTR  data;
 };
 
 struct MP_MPlayerGroup_SetWindow {
-	ULONG MethodID;
-	APTR window;
+	STACKED ULONG MethodID;
+	STACKED APTR window;
 };
 
 struct MP_MPlayerGroup_OpenFullScreen {
-	ULONG MethodID;
-	APTR enable;
+	STACKED ULONG MethodID;
+	STACKED APTR enable;
 };
 
 struct MP_MPlayerGroup_Dimensions {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_Aspect {
-	ULONG MethodID;
-	ULONG ratio;
+	STACKED ULONG MethodID;
+	STACKED ULONG ratio;
 };
 
 struct MP_MPlayerGroup_Deinterlacer {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_VideoFilter {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_Rotation {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_Flip {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_Mirror {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_Crop {
-	ULONG MethodID;
-	LONG width;
-	LONG height;
-	LONG left;
-	LONG top;
-	LONG enable;
+	STACKED ULONG MethodID;
+	STACKED LONG width;
+	STACKED LONG height;
+	STACKED LONG left;
+	STACKED LONG top;
+	STACKED LONG enable;
 };
 
 struct MP_MPlayerGroup_Scale {
-	ULONG MethodID;
-	LONG width;
-	LONG height;
-	LONG enable;
+	STACKED ULONG MethodID;
+	STACKED LONG width;
+	STACKED LONG height;
+	STACKED LONG enable;
 };
 
 struct MP_MPlayerGroup_AudioFilter {
-	ULONG MethodID;
-	ULONG which;
+	STACKED ULONG MethodID;
+	STACKED ULONG which;
 };
 
 struct MP_MPlayerGroup_AudioGain {
-	ULONG MethodID;
-	LONG gain;
-	LONG enable;
+	STACKED ULONG MethodID;
+	STACKED LONG gain;
+	STACKED LONG enable;
 };
 
 struct MP_MPlayerGroup_HandleMenu {
-	ULONG MethodID;
-	APTR userdata;
+	STACKED ULONG MethodID;
+	STACKED APTR userdata;
 };
 
 struct MP_MPlayerGroup_UnloadSubtitles
 {
-	ULONG MethodID;
-	LONG which;
+	STACKED ULONG MethodID;
+	STACKED LONG which;
 };
 
 struct MP_MPlayerGroup_SelectSubtitle {
-	ULONG MethodID;
-	LONG which;
+	STACKED ULONG MethodID;
+	STACKED LONG which;
 };
 
 struct MP_MPlayerGroup_SelectAudio {
-	ULONG MethodID;
-	LONG which;
+	STACKED ULONG MethodID;
+	STACKED LONG which;
 };
 
 struct MP_MPlayerGroup_SetValues {
-	ULONG MethodID;
-	LONG available;
+	STACKED ULONG MethodID;
+	STACKED LONG available;
 };
 
 struct MP_MPlayerGroup_IncreaseSpeed {
-	ULONG MethodID;
-	ULONG value;
+	STACKED ULONG MethodID;
+	STACKED ULONG value;
 };
 
 struct MP_MPlayerGroup_MultiplySpeed {
-	ULONG MethodID;
-	ULONG value;
+	STACKED ULONG MethodID;
+	STACKED ULONG value;
 };
 
 struct MP_MPlayerGroup_Loop {
-	ULONG MethodID;
-	LONG which;
+	STACKED ULONG MethodID;
+	STACKED LONG which;
 };
 
 /* PlaylistGroup */
 struct MP_PlaylistGroup_Add {
-	ULONG MethodID;
-	APTR * entry;
+	STACKED ULONG MethodID;
+	STACKED APTR * entry;
 };
 
 struct MP_PlaylistGroup_Refresh {
-	ULONG MethodID;
-	ULONG rebuild;
+	STACKED ULONG MethodID;
+	STACKED ULONG rebuild;
 };
 
 struct MP_PlaylistGroup_Load {
-	ULONG MethodID;
-	STRPTR path;
+	STACKED ULONG MethodID;
+	STACKED STRPTR path;
 };
 
 struct MP_PlaylistGroup_Save {
-	ULONG MethodID;
-	STRPTR path;
+	STACKED ULONG MethodID;
+	STACKED STRPTR path;
 };
 
 /* URLPopString */
 
 struct MP_URLPopString_Insert {
-	ULONG MethodID;
-	STRPTR url;
+	STACKED ULONG MethodID;
+	STACKED STRPTR url;
 };
 
 /* PrefsGroup */
 
 struct MP_PrefsGroup_SelectChange {
-	ULONG MethodID;
-	LONG listentry;
+	STACKED ULONG MethodID;
+	STACKED LONG listentry;
 };
 
 /* ConsoleGroup */
 
 struct MP_ConsoleGroup_AddMessage {
-	ULONG MethodID;
-	STRPTR message;
+	STACKED ULONG MethodID;
+	STACKED STRPTR message;
 };
 
 /* Variables */

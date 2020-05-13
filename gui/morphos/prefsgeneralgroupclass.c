@@ -137,7 +137,7 @@ DEFNEW(PrefsGeneralGroup)
 	APTR CH_RememberPath, CH_RememberPlaylist, ST_DumpPath;
 	APTR CY_Encoding, ST_FontName, CY_AutoScale;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 //			MUIA_Register_Titles, regtitles,
 		  Child, VGroup,
 					Child,
@@ -313,7 +313,7 @@ DEFNEW(PrefsGeneralGroup)
 				 data->ST_CacheDVD, 3, MUIM_Set, MUIA_Disabled, FALSE);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(PrefsGroup_Update)

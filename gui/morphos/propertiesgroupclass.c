@@ -46,7 +46,7 @@ struct PropertiesGroupData
 
 DEFNEW(PropertiesGroup)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			TITLE("General"),
 		TAG_DONE
@@ -70,7 +70,7 @@ DEFNEW(PropertiesGroup)
 		DoMethod(data->GR_Root, MUIM_Group_ExitChange);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(PropertiesGroup_Update)

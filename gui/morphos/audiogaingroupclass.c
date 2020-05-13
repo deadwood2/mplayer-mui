@@ -19,7 +19,7 @@ DEFNEW(AudioGainGroup)
 {
 	APTR BT_OK, BT_Reset, BT_Cancel, SL_Gain;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			ColGroup(2),
 				Child, TextObject, MUIA_Text_Contents, "Volume Gain:", End,
@@ -59,7 +59,7 @@ DEFNEW(AudioGainGroup)
 				 obj, 1, MM_AudioGainGroup_Cancel);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(AudioGainGroup_Apply)

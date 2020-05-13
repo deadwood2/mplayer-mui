@@ -2,9 +2,9 @@
 
 #include <libraries/asl.h>
 
-ULONG mui_getv(APTR obj, ULONG attr)
+IPTR mui_getv(APTR obj, ULONG attr)
 {
-	ULONG v;
+	IPTR v;
 
 	GetAttr(attr, obj, &v);
 	return (v);
@@ -70,8 +70,8 @@ APTR MakeDirString(CONST_STRPTR str)
 	obj = PopaslObject,
 		ASLFR_DrawersOnly, TRUE,
 		ASLFR_InitialShowVolumes, TRUE,
-		MUIA_Popstring_Button, (ULONG)pop,
-		MUIA_Popstring_String, (ULONG)MakeString(str),
+		MUIA_Popstring_Button, (IPTR)pop,
+		MUIA_Popstring_String, (IPTR)MakeString(str),
 		MUIA_Popasl_Type, ASL_FileRequest,
 		TAG_DONE);
 
@@ -89,8 +89,8 @@ APTR MakeFileString(CONST_STRPTR str)
 
 	obj = PopaslObject,
 		ASLFR_InitialFile, str,
-		MUIA_Popstring_Button, (ULONG)pop,
-		MUIA_Popstring_String, (ULONG)MakeString(str),
+		MUIA_Popstring_Button, (IPTR)pop,
+		MUIA_Popstring_String, (IPTR)MakeString(str),
 		MUIA_Popasl_Type, ASL_FileRequest,
 		TAG_DONE);
 

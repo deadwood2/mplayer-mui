@@ -54,7 +54,7 @@ struct VideoAreaData
 
 DEFNEW(VideoArea)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		MUIA_CycleChain, FALSE,
 		InnerSpacing(0,0),
 #if USE_BACKFILL
@@ -64,7 +64,7 @@ DEFNEW(VideoArea)
 		TAG_MORE, INITTAGS
 	);
 
-	return ((ULONG)obj);
+	return ((IPTR)obj);
 }
 
 DEFMMETHOD(AskMinMax)

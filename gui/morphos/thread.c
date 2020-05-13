@@ -43,13 +43,13 @@ struct Thread *	RunThread(int (*func) (void), const char * threadname, APTR obj,
 #else
                 thread->task = CreateNewProcTags(
 #endif
-										 NP_Name,		 (ULONG) threadname,
-										 NP_Entry,       (ULONG) func,
+										 NP_Name,		 (IPTR) threadname,
+										 NP_Entry,       (IPTR) func,
 #if !defined(__AROS__)
 										 NP_StartupMsg,  (ULONG) thread->msg,
 										 NP_TaskMsgPort, (ULONG) &port,
 #else
-                                         NP_UserData,  (IPTR) thread->msg,
+                                         NP_UserData,    (IPTR) thread->msg,
 #endif
 										 NP_CloseOutput, FALSE,
 										 NP_Output,      Output(),
@@ -59,7 +59,7 @@ struct Thread *	RunThread(int (*func) (void), const char * threadname, APTR obj,
 #if !defined(__AROS__)
 										 NP_PPCStackSize, 65536,
 #else
-                                         NP_StackSize, 65536,
+                                         NP_StackSize,   65536,
 #endif
 										 TAG_DONE);
 			}

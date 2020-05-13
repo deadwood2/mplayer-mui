@@ -15,7 +15,7 @@ struct VolumeSliderData
 
 DEFNEW(VolumeSlider)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		MUIA_Numeric_Min,  0,
 		MUIA_Numeric_Max,  100,
 		MUIA_Slider_Min,   0,
@@ -24,7 +24,7 @@ DEFNEW(VolumeSlider)
 		TAG_MORE, INITTAGS,
 	End;
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFMMETHOD(Numeric_Stringify)
@@ -33,7 +33,7 @@ DEFMMETHOD(Numeric_Stringify)
 
 	snprintf(data->buffer, sizeof(data->buffer), " ");
 
-	return ((ULONG)data->buffer);
+	return ((IPTR)data->buffer);
 }
 
 DEFMMETHOD(AskMinMax)

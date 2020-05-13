@@ -12,10 +12,10 @@ struct MPlayerAppData
 
 DEFNEW(MPlayerApp)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		    TAG_MORE, INITTAGS);
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFSET(MPlayerApp)

@@ -19,7 +19,7 @@ DEFNEW(DVDDirGroup)
 {
 	APTR BT_OK, BT_Cancel, PO_Dir, ST_Dir;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			TextObject,
 			  MUIA_Text_Contents, "A DVD can be played from hard disk by selecting the directory\n"
@@ -62,7 +62,7 @@ DEFNEW(DVDDirGroup)
 				 obj, 1, MM_DVDDirGroup_Open);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(DVDDirGroup_Open)

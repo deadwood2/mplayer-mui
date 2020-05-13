@@ -56,7 +56,7 @@ static void doset(APTR obj, struct PlaylistListData *data, struct TagItem *tags)
 
 DEFNEW(PlaylistList)
 {
-	obj = (Object * ) DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 					MUIA_Frame, MUIV_Frame_InputList,
 					MUIA_CycleChain, 1,
 					MUIA_List_Format, ",MIW=-1 MAW=-2 BAR, BAR H, BAR H, BAR H",
@@ -76,7 +76,7 @@ DEFNEW(PlaylistList)
         data->sort_direction = 1;	 
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(PlaylistList)
@@ -111,12 +111,12 @@ DEFMMETHOD(List_Display)
 	{
 		static TEXT duration[64];
 		static TEXT title[256];
-		static TEXT state[16];
+		static TEXT state[32];
 
 		LONG pos = (LONG) msg->array[-1];
 		int	h=0, m=0, s=0;
 
-		ULONG image = 0;
+		IPTR image = 0;
 
 		if(pos%2)
 		{
@@ -139,13 +139,13 @@ DEFMMETHOD(List_Display)
 		{
 			default:
 			case GUI_STOP:
-				image = (ULONG) data->img_stop;
+				image = (IPTR) data->img_stop;
 				break;
 			case GUI_PLAY:
-				image = (ULONG) data->img_play;
+				image = (IPTR) data->img_play;
 				break;
 			case GUI_PAUSE:
-				image = (ULONG) data->img_pause;		
+				image = (IPTR) data->img_pause;
 				break;
 		}
 
@@ -197,7 +197,7 @@ DEFMMETHOD(List_Construct)
 		if(data->title)    stccpy(new_entry->title, data->title, sizeof(new_entry->title));
 		new_entry->duration = data->duration;
 	}
-	return (ULONG) new_entry;
+	return (IPTR) new_entry;
 }
 
 DEFMMETHOD(List_Destruct)

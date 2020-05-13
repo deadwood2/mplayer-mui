@@ -44,7 +44,7 @@ DEFNEW(PrefsGroup)
 {
 	APTR BT_Save, BT_Cancel, BT_Use, LI_Categories, GR_Container, GR_Content;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child, HGroup,
 			Child,
 				LI_Categories = NewObject(getprefslistclass(), NULL, TAG_DONE),
@@ -100,7 +100,7 @@ DEFNEW(PrefsGroup)
 		DoMethod(data->BT_Cancel, MUIM_Notify, MUIA_Pressed, FALSE, obj, 1, MM_PrefsGroup_Cancel);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(PrefsGroup)

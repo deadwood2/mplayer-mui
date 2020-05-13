@@ -18,7 +18,7 @@ struct ConsoleListData
 
 DEFNEW(ConsoleList)
 {
-	obj = (Object * ) DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 					MUIA_Frame, MUIV_Frame_InputList,
 					MUIA_CycleChain, 1,
 					MUIA_List_Format, "MIW=-1 MAW=-2",
@@ -31,7 +31,7 @@ DEFNEW(ConsoleList)
 		struct ConsoleListData *data = INST_DATA(cl, obj);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(ConsoleList)
@@ -80,7 +80,7 @@ DEFMMETHOD(List_Construct)
 		}
 	}
 
-	return (ULONG) new_entry;
+	return (IPTR) new_entry;
 }
 
 DEFMMETHOD(List_Destruct)

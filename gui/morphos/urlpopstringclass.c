@@ -95,7 +95,7 @@ DEFNEW(URLPopStringGroup)
 	Object *str, *bt_prev, *bt_next;
 	Object *pop, *bt_pop, *lv_entries;
 
-	obj = (Object *) DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		MUIA_Group_Horiz, TRUE,
 		Child, pop = PopobjectObject,
 			MUIA_Popstring_String, str = StringObject,

@@ -37,7 +37,7 @@ DEFNEW(ScaleGroup)
 	snprintf(str_width, sizeof(str_width), "%ld", width);
 	snprintf(str_height, sizeof(str_height), "%ld", height);
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			ColGroup(2),
 				Child, TextObject, MUIA_Text_Contents, "Width:", End,
@@ -77,7 +77,7 @@ DEFNEW(ScaleGroup)
 				 obj, 1, MM_ScaleGroup_Cancel);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(ScaleGroup_UpdateDimensions)

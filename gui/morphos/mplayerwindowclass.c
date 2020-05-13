@@ -13,7 +13,7 @@ struct MPlayerWindowData
 
 DEFNEW(MPlayerWindow)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		    TAG_MORE, INITTAGS);
 
 	if (obj)
@@ -22,7 +22,7 @@ DEFNEW(MPlayerWindow)
 
 		data->opened = FALSE;
 
-		return (ULONG)obj;
+		return (IPTR)obj;
 	}
 
 	return(0);
@@ -31,7 +31,7 @@ DEFNEW(MPlayerWindow)
 DEFSET(MPlayerWindow)
 {
 	struct MPlayerWindowData *data = INST_DATA(cl,obj);
-	ULONG rc = 0;
+	IPTR rc = 0;
 
 	if(mygui->embedded)
 	{

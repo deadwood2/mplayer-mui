@@ -25,7 +25,7 @@ struct PictureButtonData
 
 DEFNEW(PictureButton)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 			MUIA_Dtpic_DarkenSelState,TRUE,
 			MUIA_Dtpic_LightenOnMouse,TRUE,
 			MUIA_ShowSelState, FALSE,
@@ -50,7 +50,7 @@ DEFNEW(PictureButton)
 		DoMethod(obj, MUIM_Notify, MUIA_Pressed, FALSE,
 				 obj, 3, MUIM_Set, MA_PictureButton_Hit, data->UserData);
 
-		return (ULONG)obj;
+		return (IPTR)obj;
 	}
 
 	return(0);

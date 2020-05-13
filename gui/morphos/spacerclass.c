@@ -37,7 +37,7 @@ DEFNEW(Spacer)
 	}
 	NEXTTAG
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		MUIA_CycleChain,   FALSE,
 		InnerSpacing(0,0),
 		TAG_MORE, INITTAGS
@@ -51,7 +51,7 @@ DEFNEW(Spacer)
 		data->brightness_threshold = 255;
 	}
 
-	return ((ULONG)obj);
+	return ((IPTR)obj);
 }
 
 #define SPACE_WIDTH  10

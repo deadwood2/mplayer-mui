@@ -15,11 +15,11 @@ struct PopListData
 
 DEFNEW(PopList)
 {
-	obj = (Object * ) DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 					InputListFrame,
 					End;
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(PopList)
@@ -48,7 +48,7 @@ DEFMMETHOD(List_Construct)
 	{
 		stccpy(new_entry->label, label, sizeof(new_entry->label));
 	}
-	return (ULONG) new_entry;
+	return (IPTR) new_entry;
 }
 
 DEFMMETHOD(List_Destruct)

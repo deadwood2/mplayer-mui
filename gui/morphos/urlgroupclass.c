@@ -20,7 +20,7 @@ DEFNEW(URLGroup)
 {
 	APTR BT_OK, BT_Cancel, ST_URL;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			HGroup,
 				Child, MUI_NewObject(MUIC_Dtpic, MUIA_Dtpic_Name, "PROGDIR:images/url.png", End,
@@ -57,7 +57,7 @@ DEFNEW(URLGroup)
 				 obj, 1, MM_URLGroup_Open);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(URLGroup_Open)
@@ -100,7 +100,7 @@ DEFSET(URLGroup)
     FORTAG(INITTAGS)
     {
         case MA_URLGroup_Target:
-            data->TargetObj = tag->ti_Data;
+            data->TargetObj = (APTR)tag->ti_Data;
             break;
     }
     NEXTTAG

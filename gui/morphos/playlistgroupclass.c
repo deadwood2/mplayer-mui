@@ -98,7 +98,7 @@ DEFNEW(PlaylistGroup)
 {
 	APTR LI_Playlist, BT_Play, BT_Add, BT_Remove, BT_MoveUp, BT_MoveDown, BT_Save, BT_Shuffle, BT_Clear;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		MUIA_Group_Horiz, TRUE,
 		Child,
 			LI_Playlist = NewObject(getplaylistlistclass(), NULL, TAG_DONE),
@@ -174,7 +174,7 @@ DEFNEW(PlaylistGroup)
 		}
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(PlaylistGroup)

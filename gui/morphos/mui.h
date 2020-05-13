@@ -1,7 +1,7 @@
 #ifndef __MUI_H__
 
 /* MUI helpers */
-ULONG mui_getv(APTR o, ULONG a);
+IPTR mui_getv(APTR o, ULONG a);
 
 #define getv(_o,_a) mui_getv(_o,_a)
 #ifndef nnset
@@ -28,7 +28,7 @@ ULONG mui_getv(APTR o, ULONG a);
 
 #ifndef MUIM_Application_KillPushMethod
 #define MUIM_Application_KillPushMethod     0x80429954 /* private */ /* V15 */
-struct  MUIP_Application_KillPushMethod     { ULONG MethodID; Object *o; ULONG id; ULONG method; };
+struct  MUIP_Application_KillPushMethod     { STACKED LONG MethodID; Object *o; STACKED ULONG id; STACKED ULONG method; };
 #endif
 
 #ifndef MUIF_PUSHMETHOD_SINGLE

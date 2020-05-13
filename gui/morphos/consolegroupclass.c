@@ -19,7 +19,7 @@ DEFNEW(ConsoleGroup)
 {
 	APTR LI_Messages, BT_Clear;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			LI_Messages = NewObject(getconsolelistclass(), NULL, TAG_DONE),
 
@@ -45,7 +45,7 @@ DEFNEW(ConsoleGroup)
 
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(ConsoleGroup)

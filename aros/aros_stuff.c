@@ -1,14 +1,15 @@
 #ifdef __AROS__
 
 #include <utility/tagitem.h>
-#include <proto/intuition.h>
+#include <aros/preprocessor/variadic/cast2iptr.hpp>
+#include <proto/alib.h>
 #include <stdlib.h>
 
-IPTR DoSuperNew(struct IClass *cl, Object *obj, ULONG tag1, ...)
+IPTR DoSuperNew(Class *cl, Object *obj, Tag tag1, ...)
 {
-    AROS_SLOWSTACKTAGS_PRE(tag1)
-    retval = (IPTR)DoSuperMethod(cl, obj, OM_NEW, AROS_SLOWSTACKTAGS_ARG(tag1));
-    AROS_SLOWSTACKTAGS_POST
+    AROS_SLOWSTACKMETHODS_PRE(tag1)
+    retval = (IPTR)DoSuperNewTagList(cl, obj, NULL, (struct TagItem *)AROS_SLOWSTACKMETHODS_ARG(tag1));
+    AROS_SLOWSTACKMETHODS_POST
 }
 
 APTR AllocVecTaskPooled(ULONG byteSize)

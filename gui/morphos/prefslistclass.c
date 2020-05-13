@@ -6,7 +6,7 @@ struct PrefsListData {
 
 DEFNEW(PrefsList)
 {
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		InputListFrame,
 		MUIA_List_ConstructHook, MUIV_List_ConstructHook_String,
 		MUIA_List_DestructHook, MUIV_List_DestructHook_String,
@@ -15,7 +15,7 @@ DEFNEW(PrefsList)
 		MUIA_List_AutoVisible, TRUE,
 	End;
 
-	return ((ULONG)obj);
+	return ((IPTR)obj);
 }
 
 BEGINMTABLE2(prefslistclass)

@@ -41,7 +41,7 @@ DEFNEW(CropGroup)
 	snprintf(str_width, sizeof(str_width), "%ld", width);
 	snprintf(str_height, sizeof(str_height), "%ld", height);
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		Child,
 			ColGroup(4),
 				Child, TextObject, MUIA_Text_Contents, "Left:", End,
@@ -87,7 +87,7 @@ DEFNEW(CropGroup)
 				 obj, 1, MM_CropGroup_Cancel);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFTMETHOD(CropGroup_UpdateDimensions)

@@ -205,7 +205,7 @@ DEFNEW(MPlayerGroup)
 
 	APTR AR_Video;
 
-	obj = DoSuperNew(cl, obj,
+	obj = (Object *)DoSuperNew(cl, obj,
 		InnerSpacing(0, 0),
 		Child,
 			GR_Toolbar = HGroup, MUIA_InnerTop, 4, MUIA_InnerLeft, 4, MUIA_InnerRight, 4, MUIA_InnerBottom, 0, MUIA_Group_VertSpacing, 4,
@@ -465,7 +465,7 @@ DEFNEW(MPlayerGroup)
 				 data->GR_Control, 3, MUIM_Set, MUIA_InnerBottom, 4);
 	}
 
-	return (ULONG)obj;
+	return (IPTR)obj;
 }
 
 DEFDISP(MPlayerGroup)
@@ -531,7 +531,7 @@ DEFMMETHOD(Setup)
 	data->ehnode.ehn_Events =  IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_MOUSEMOVE | IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW;
 	data->ehnode.ehn_Priority = 2; /* priority over MUI's areaclass */
 	data->ehnode.ehn_Flags = MUI_EHF_GUIMODE;
-	DoMethod(_win(obj), MUIM_Window_AddEventHandler, (ULONG)&data->ehnode);
+	DoMethod(_win(obj), MUIM_Window_AddEventHandler, (IPTR)&data->ehnode);
 
 	if(mygui->embedded)
 	{
@@ -552,7 +552,7 @@ DEFMMETHOD(Cleanup)
 {
 	struct MPlayerGroupData *data = INST_DATA(cl, obj);
 
-	DoMethod(_win(obj), MUIM_Window_RemEventHandler, (ULONG)&data->ehnode);
+	DoMethod(_win(obj), MUIM_Window_RemEventHandler, (IPTR)&data->ehnode);
 	DoMethod(app, MUIM_Application_RemInputHandler, &data->ihnode);
 
 	return DOSUPER;
@@ -560,7 +560,7 @@ DEFMMETHOD(Cleanup)
 
 DEFMMETHOD(Show)
 {
-	ULONG rc = DOSUPER;
+	IPTR rc = DOSUPER;
 
 	if(mygui->embedded)
 	{
@@ -593,7 +593,7 @@ DEFMMETHOD(Show)
 
 DEFSMETHOD(MPlayerGroup_Show)
 {
-	ULONG val = FALSE;
+	IPTR val = FALSE;
 
 	switch(msg->show)
 	{
@@ -625,7 +625,7 @@ DEFSMETHOD(MPlayerGroup_Show)
 
 DEFTMETHOD(MPlayerGroup_ShowPlaylist)
 {
-	ULONG open = TRUE;
+	IPTR open = TRUE;
 
 	if(getv(mygui->playlistwindow, MUIA_Window_Open))
 	{
@@ -643,7 +643,7 @@ DEFTMETHOD(MPlayerGroup_ShowPlaylist)
 
 DEFTMETHOD(MPlayerGroup_ShowProperties)
 {
-	ULONG open = TRUE;
+	IPTR open = TRUE;
 
 	if(getv(mygui->propertieswindow, MUIA_Window_Open))
 	{
@@ -1856,8 +1856,8 @@ DEFSMETHOD(MPlayerGroup_Dimensions)
 	set(mygui->mainwindow, MUIA_Window_ID, 0);
 
 	SetAttrs(mygui->mainwindow,
-			 MUIA_Window_Width, (ULONG) width,
-			 MUIA_Window_Height,(ULONG) height,
+			 MUIA_Window_Width, (IPTR) width,
+			 MUIA_Window_Height,(IPTR) height,
 			 TAG_DONE);
 
 	set(mygui->mainwindow, MUIA_Window_ID, MAKE_ID('M','A','I','N'));
@@ -2409,7 +2409,7 @@ DEFSMETHOD(MPlayerGroup_SetAngle)
 
 DEFSMETHOD(MPlayerGroup_HandleMenu)
 {
-	switch((ULONG) msg->userdata)
+	switch((IPTR) msg->userdata)
 	{
 		/* Project */
 		case MEN_FILE:
@@ -2525,7 +2525,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_REPEAT_SINGLE:
 		case MEN_REPEAT_PLAYLIST:
 		case MEN_REPEAT_QUIT:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Loop, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Loop, (IPTR) msg->userdata);
 			break;
 
 		case MEN_RECORD:
@@ -2545,7 +2545,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_DIMENSIONS_HALF:
 		case MEN_DIMENSIONS_DOUBLE:
 		case MEN_DIMENSIONS_FREE:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Dimensions, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Dimensions, (IPTR) msg->userdata);
 			break;
 
 		case MEN_ASPECT_AUTO:
@@ -2553,7 +2553,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_ASPECT_5_4:
 		case MEN_ASPECT_16_9:
 		case MEN_ASPECT_16_10:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Aspect, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Aspect, (IPTR) msg->userdata);
 			break;
 
 		case MEN_DEINTERLACER_OFF:
@@ -2562,7 +2562,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_DEINTERLACER_LB:
 		case MEN_DEINTERLACER_YADIF1:
 		case MEN_DEINTERLACER_KERNDEINT:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Deinterlacer, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Deinterlacer, (IPTR) msg->userdata);
 			break;
 
 		case MEN_DENOISE_OFF:
@@ -2570,7 +2570,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_DENOISE_SOFT:
 		case MEN_DEBLOCK:
 		case MEN_DERING:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_VideoFilter, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_VideoFilter, (IPTR) msg->userdata);
 			break;
 
 		case MEN_ROTATE_OFF:
@@ -2578,15 +2578,15 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_ROTATE_2:
 		case MEN_ROTATE_3:
 		case MEN_ROTATE_4:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Rotation, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Rotation, (IPTR) msg->userdata);
 			break;
 
 		case MEN_FLIP:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Flip, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Flip, (IPTR) msg->userdata);
 			break;
 
 		case MEN_MIRROR:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_Mirror, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_Mirror, (IPTR) msg->userdata);
 			break;
 
 		case MEN_CROP:
@@ -2622,7 +2622,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_VOLNORM:
 		case MEN_KARAOKE:
 		case MEN_SCALETEMPO:
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_AudioFilter, (ULONG) msg->userdata);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_AudioFilter, (IPTR) msg->userdata);
 			break;
 
 		case MEN_AUDIOGAIN:
@@ -2699,25 +2699,25 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 	}
 
 	/* variable entries subs & audio menus */
-	if((int)msg->userdata >= MEN_SUBTITLEBASE && (int)msg->userdata < MEN_SUBTITLEBASE + 32)
+	if((IPTR)msg->userdata >= MEN_SUBTITLEBASE && (IPTR)msg->userdata < MEN_SUBTITLEBASE + 32)
 	{
 		ULONG checked;
 		DoMethod(mygui->menustrip, MUIM_GetUData, msg->userdata, MUIA_Menuitem_Checked, &checked);
 
 		if(checked)
 		{
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_SelectSubtitle, msg->userdata - MEN_SUBTITLEBASE);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_SelectSubtitle, (IPTR)msg->userdata - MEN_SUBTITLEBASE);
 		}
 	}
 
-	if((int)msg->userdata >= MEN_AUDIOTRACKBASE && (int)msg->userdata < MEN_AUDIOTRACKBASE + 32)
+	if((IPTR)msg->userdata >= MEN_AUDIOTRACKBASE && (IPTR)msg->userdata < MEN_AUDIOTRACKBASE + 32)
 	{
 		ULONG checked;
 		DoMethod(mygui->menustrip, MUIM_GetUData, msg->userdata, MUIA_Menuitem_Checked, &checked);
 
 		if(checked)
 		{
-			DoMethod(mygui->maingroup, MM_MPlayerGroup_SelectAudio, msg->userdata - MEN_AUDIOTRACKBASE);
+			DoMethod(mygui->maingroup, MM_MPlayerGroup_SelectAudio, (IPTR)msg->userdata - MEN_AUDIOTRACKBASE);
 		}
 	}
 
@@ -2726,7 +2726,7 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 
 DEFMMETHOD(HandleEvent)
 {
-	ULONG rc = 0;
+	IPTR rc = 0;
 	struct MPlayerGroupData *data = INST_DATA(cl, obj);
 
 	if (msg->imsg)

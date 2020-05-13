@@ -22,7 +22,7 @@
 #define PATTERN_SUBTITLE "#?.(srt|ssa|ass|sub|txt|vob|utf|utf8|utf-8|smi|rt|aqt|jss|js)"
 
 #if defined(__AROS__)
-IPTR DoSuperNew(struct IClass *cl, Object *obj, ULONG tag1, ...);
+IPTR DoSuperNew(Class *cl, Object *obj, Tag tag1, ...);
 APTR AllocVecTaskPooled(ULONG byteSize);
 VOID FreeVecTaskPooled(APTR memory);
 #undef NewObject
