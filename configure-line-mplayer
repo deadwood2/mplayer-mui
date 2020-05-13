@@ -1,0 +1,6 @@
+./configure --target=i686-aros --disable-mencoder --enable-cross-compile --cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-liba52-internal --enable-menu
+./configure --target=i686-aros --disable-mencoder --enable-cross-compile --cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-liba52-internal --enable-menu --disable-libdvdcss-internal
+./configure --target=i686-aros --disable-mplayer --enable-cross-compile --cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --disable-sdl --disable-unrarexec --enable-liba52-internal --enable-menu --disable-libdvdcss-internal
+
+r34007
+./configure --target=i686-aros --disable-mencoder --enable-cross-compile --cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-menu --yasm='' --enable-ass-internal --disable-openal
