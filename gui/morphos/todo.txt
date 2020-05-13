@@ -1,0 +1,33 @@
+ok - Current time bug in DVD (not present in OSD, so fixable)
+-> cache2.c : fixed, but resulting slowness?
+ok - dvdnav SetDVD : implement
+ok - chapter/title selection (replace code with mpcmd)
+ok - prev/next behaviour to change with dvd chapters
+ok - properties
+ok - fullscreen show/hide gui on click rather than move.
+ok - button states (mute)
+ok - audio/subs tracks selection menu (peek stream struct)
+ok - subtitle file (srt) load
+
+ok - prefs
+  - video/audio driver
+  - cache
+  - ...
+
+issues:
+ok - dvd_device gets corrupted after using playlists or so
+ok - add screenshot
+
+
+- add status msg for some actions
+- artist/duration in playlist (try to get it -> meta data for currently played file)
+- vo_gui -> wpa
+- separated mode: stop causes reopening window
+- got a weird delayed events and finally lock at exit -> still reproducible?
+- add "dvd menu" icon
+ok - dumping option (is that possible)
+ok - option to resize window to original movie dimensions
+ok - shuffle mode
+ok - truncate snapshots filenames to 107-4 or so
+ok - avoid refreshing status so much
+ok - open prison break and then bsg 4x1 -> overlay leftover -> missing clear somewhere
