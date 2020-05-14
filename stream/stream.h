@@ -32,6 +32,7 @@
 #if defined(__AROS__)
 #define lseek64 lseek
 #define off64_t off_t
+typedef long int quad_t;
 #endif
 
 #ifndef O_BINARY
@@ -352,11 +353,11 @@ static inline off_t stream_tell(stream_t *s)
 static inline int stream_seek(stream_t *s, off_t pos)
 {
 
-  mp_dbg(MSGT_DEMUX, MSGL_DBG3, "seek to 0x%"PRIX32"\n", pos);
+  mp_dbg(MSGT_DEMUX, MSGL_DBG3, "seek to 0x%"PRIX64"\n", pos);
 
   if (pos < 0) {
     mp_msg(MSGT_DEMUX, MSGL_ERR,
-           "Invalid seek to negative position %"PRIx32"!\n", pos);
+           "Invalid seek to negative position %"PRIx64"!\n", pos);
     pos = 0;
   }
   if(pos<s->pos){

@@ -855,7 +855,7 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
 						 NP_StartupMsg,             (ULONG) stream->StartupMsg,
 #else
     if ( ! (cachetask = CreateNewProcTags(
-                         NP_Entry,                  (ULONG) CacheTask,
+                         NP_Entry,                  (IPTR) CacheTask,
                          NP_UserData,               (IPTR)stream->StartupMsg,
 #endif
 						 //NP_Priority,               1,

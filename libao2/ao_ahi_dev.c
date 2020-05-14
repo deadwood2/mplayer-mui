@@ -495,7 +495,7 @@ if ( ( sig_taskready = AllocSignal ( -1 ) )  == -1 ) {
 #ifndef __AROS__
 				  NP_CodeType,         CODETYPE_PPC,
 #endif
-				  NP_Entry,            (ULONG) PlayerTask,
+				  NP_Entry,            (IPTR) PlayerTask,
 				  NP_Name,             PLAYERTASK_NAME,
 				  NP_Priority,         PLAYERTASK_PRIORITY,          
 				  //NP_StartupMsg,     (ULONG) msg,
