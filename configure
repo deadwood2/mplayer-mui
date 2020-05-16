@@ -225,6 +225,7 @@ issystem() {
 aix()       { issystem "AIX"; }
 amigaos()   { issystem "AmigaOS"; }
 aros()      { issystem "AROS"; }
+axrt()      { issystem "AxRT"; }
 bsdos()     { issystem "BSD/OS"; }
 cygwin()    { issystem "CYGWIN"; }
 darwin()    { issystem "Darwin"; }
@@ -1536,6 +1537,7 @@ else # if test -z "$_target"
       mingw32*) system_name=MINGW32 ;;
       wine) system_name=Wine ;;
       aros) system_name=AROS ;;
+      axrt) system_name=AxRT ;;
     esac
   done
   # We need to convert underscores so that values like k6-2 and pentium-mmx can be passed
@@ -1593,9 +1595,7 @@ if amigaos ; then
   extra_cflags="-DNEWLIB -D__USE_INLINE__ $extra_cflags"
 fi
 
-if aros ; then
-  extra_cflags="-nix -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -Iaros/include -Ilibdvdnav $extra_cflags"
-  extra_ldflags="$extra_ldflags -nix -L./aros/obj -lmissing -lcybergraphics"
+if aros || axrt ; then
   _aros_common=yes
   _cgx_common=yes
   _cgx_wpa=yes
@@ -1605,6 +1605,17 @@ if aros ; then
   _mandir="PROGDIR:man"
   _confdir="PROGDIR:conf"
   _libdir="PROGDIR:"
+fi
+
+if aros ; then
+  extra_cflags="-nix -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -Iaros/include -Ilibdvdnav $extra_cflags"
+  extra_ldflags="$extra_ldflags -nix -L./aros/obj -lmissing -lcybergraphics"
+fi
+
+if axrt ; then
+  extra_cflags="-D__AROS__ -I/usr/include/axrt -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -Ilibdvdnav $extra_cflags"
+  extra_ldflags="$extra_ldflags -specs=/usr/lib/x86_64-linux-gnu/axrt.specs -lcybergraphics -lmui -lstdc.static -lstdc -lmuimaster -licon -lgraphics -lkeymap -llayers -ldos -lutility -lexec"
+  _axrt_objs=yes
 fi
 
 if qnx ; then
@@ -2593,7 +2604,7 @@ fi # if darwin && test "$cc_vendor" = "gnu" ; then
 # Checking for CFLAGS
 _install_strip="-s"
 if test "$_profile" != "" || test "$_debug" != "" ; then
-  CFLAGS="-O2 $_march $_mcpu $_pipe $_debug $_profile"
+  CFLAGS="-O1 $_march $_mcpu $_pipe $_debug $_profile"
   WARNFLAGS="-W -Wall"
   _install_strip=
 elif test -z "$CFLAGS" ; then
@@ -3170,7 +3181,7 @@ echores "$_nanosleep"
 
 
 echocheck "socklib"
-if aros ; then
+if aros || axrt ; then
 cat > $TMPC << EOF
 #include <netdb.h>
 #include <proto/socket.h>
@@ -3384,7 +3395,7 @@ echores "$_closesocket"
 echocheck "networking"
 test $_winsock2_h = no && test $inet_pton = no &&
   test $inet_aton = no && networking=no
-if aros ; then
+if aros || axrt ; then
 networking=yes
 fi
 if test "$networking" = yes ; then
@@ -5710,13 +5721,13 @@ elif sunos ; then
   test $(uname -r | sed 's/^5\.//') -gt 10 && default_cdrom_device="/cdrom/cdrom0"
 elif amigaos ; then
   default_cdrom_device="a1ide.device:2"
-elif aros ; then
+elif aros || axrt ; then
   default_cdrom_device="ata.device:2"
 else
   default_cdrom_device="/dev/cdrom"
 fi
 
-if win32 || os2 || dragonfly || freebsd || openbsd || sunos || amigaos || aros ; then
+if win32 || os2 || dragonfly || freebsd || openbsd || sunos || amigaos || aros || axrt ; then
   default_dvd_device=$default_cdrom_device
 elif darwin ; then
   default_dvd_device="/dev/rdiskN"
@@ -5772,7 +5783,7 @@ if test "$_dvdread_internal" = auto ; then
     _dvdread_internal=yes
     _dvdread=yes
     extra_cflags="-Ilibdvdread4 $extra_cflags"
-  elif aros ; then
+  elif aros || axrt ; then
     _dvdread_internal=yes
     _dvdread=yes
     extra_cflags="-Ilibdvdread4 $extra_cflags"
@@ -5918,7 +5929,7 @@ else
 fi
 echores "$_bitmap_font"
 
-if aros ; then
+if aros || axrt ; then
 #FreeType AROS check
 
 echocheck "freetype >= 2.0.9"
@@ -5950,7 +5961,7 @@ EOF
 fi
 if test "$_freetype" = yes ; then
     def_freetype='#define CONFIG_FREETYPE 1'
-    extra_ldflags="$extra_ldflags -lfreetype2"
+    extra_ldflags="$extra_ldflags -lfreetype2.static"
 else
     def_freetype='#undef CONFIG_FREETYPE'
 fi
@@ -7603,7 +7614,7 @@ if test "$_gui" = yes ; then
   fi
   test "$_freetype" = no && test "$_bitmap_font" = no &&
     die "The GUI requires either FreeType or bitmap font support."
-if aros ; then
+if aros || axrt ; then
   _gui_mui=yes
   libs_mplayer="$libs_mplayer -lmui"
   def_gui='#define CONFIG_GUI 1'
@@ -8195,6 +8206,7 @@ APPLE_REMOTE = $_apple_remote
 ARTS = $_arts
 AROS_COMMON = $_aros_common
 AUDIO_INPUT = $_audio_input
+AXRT_OBJS = $_axrt_objs
 BITMAP_FONT = $_bitmap_font
 BL = $_bl
 CACA = $_caca
