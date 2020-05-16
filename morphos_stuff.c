@@ -1789,11 +1789,13 @@ STRPTR stristr(CONST_STRPTR str1, CONST_STRPTR str2)
 	return NULL;
 }
 
+#if defined(__MORPHOS__) && !defined(__AROS__)
 unsigned int sleep(unsigned int seconds)
 {
 	TimeDelay(0, seconds, 0);
 	return 0;
 }
+#endif
 
 double trunc(double x)
 {
