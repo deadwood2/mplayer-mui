@@ -3497,6 +3497,10 @@ play_next_file:
 // CACHE2: initial prefill: 20%  later: 5%  (should be set by -cacheopts)
 goto_enable_cache:
     if (stream_cache_size > 0) {
+#ifdef __MORPHOS__
+        mp_msg(MSGT_NETWORK,MSGL_INFO,MSGTR_MPDEMUX_NW_CacheSizeSetTo, stream_cache_size);
+#endif
+
         int res;
         current_module = "enable_cache";
         res = stream_enable_cache(mpctx->stream, stream_cache_size * 1024ull,

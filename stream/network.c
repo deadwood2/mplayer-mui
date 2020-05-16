@@ -524,7 +524,9 @@ void fixup_network_stream_cache(stream_t *stream) {
       stream_cache_size = (stream->streaming_ctrl->prebuffer_size/1024)*5;
       if( stream_cache_size<64 ) stream_cache_size = 64;	// 16KBytes min buffer
     }
+#ifndef __MORPHOS__
     mp_msg(MSGT_NETWORK,MSGL_INFO,MSGTR_MPDEMUX_NW_CacheSizeSetTo, stream_cache_size);
+#endif
   }
 }
 
