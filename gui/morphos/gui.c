@@ -558,6 +558,7 @@ int creategui(void)
 					MUIA_Window_Title, "Playlist",
 					MUIA_Window_ID, MAKE_ID('P','L','A','Y'),
 					MUIA_Window_AppWindow, TRUE,
+					MUIA_Window_Width, 600,
 					WindowContents,
 						GR_PlaylistGroup = NewObject(getplaylistgroupclass(), NULL, TAG_DONE),
 
@@ -577,6 +578,7 @@ int creategui(void)
 					MUIA_Window_ScreenTitle, muititle,
 					MUIA_Window_Title, "Enter URL",
 					MUIA_Window_ID, MAKE_ID('U','R','L','W'),
+					MUIA_Window_Width, 600,
 					WindowContents,
 						GR_URLGroup = NewObject(geturlgroupclass(), NULL, MA_URLGroup_Target, GR_MPlayerGroup, TAG_DONE),
 			End,
