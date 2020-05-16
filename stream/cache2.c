@@ -767,7 +767,7 @@ static void cache_mainloop(cache_vars_t *s) {
  * \return 1 on success, 0 if the function was interrupted and -1 on error
  */
 int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_limit){
-  int ss=(stream->type==STREAMTYPE_VCD)?VCD_SECTOR_DATA:STREAM_BUFFER_SIZE;
+  int ss = stream->sector_size ? stream->sector_size : STREAM_BUFFER_SIZE;
   int res = -1;
   cache_vars_t* s;
 
@@ -950,12 +950,12 @@ int cache_stream_fill_buffer(stream_t *s){
 
   if(s->pos!=((cache_vars_t*)s->cache_data)->read_filepos) mp_msg(MSGT_CACHE,MSGL_ERR,"!!! read_filepos differs!!! report this bug...\n");
   sector_size = ((cache_vars_t*)s->cache_data)->sector_size;
-/*
+
   if (sector_size > STREAM_MAX_SECTOR_SIZE) {
     mp_msg(MSGT_CACHE, MSGL_ERR, "Sector size %i larger than maximum %i\n", sector_size, STREAM_MAX_SECTOR_SIZE);
     sector_size = STREAM_MAX_SECTOR_SIZE;
   }
-*/
+
   len=cache_read(s->cache_data,s->buffer, sector_size);
   //printf("cache_stream_fill_buffer->read -> %d\n",len);
 

@@ -61,11 +61,7 @@ typedef long int quad_t;
 #define STREAMTYPE_BLURAY 20
 #define STREAMTYPE_BD 21
 
-#ifdef __MORPHOS__
-#define STREAM_BUFFER_SIZE 65536
-#else
 #define STREAM_BUFFER_SIZE 2048
-#endif
 #define STREAM_MAX_SECTOR_SIZE (8*1024)
 
 #define VCD_SECTOR_SIZE 2352
