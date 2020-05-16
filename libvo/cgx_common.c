@@ -124,7 +124,7 @@ static const char *Messages[]=
 
 void Cgx_Message(void)
 {
-	struct timeval tv;
+	struct Timeval tv;
 	GetSysTime(&tv);
 	if ( ( tv.tv_secs % 60) < 5)  Printf("Message: %s\n", Messages[ tv.tv_micro % 3 ] );
 }

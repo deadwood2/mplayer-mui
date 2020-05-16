@@ -37,6 +37,7 @@
 #include "playlist.h"
 #include "morphos_stuff.h"
 #include <clib/debug_protos.h>
+#include <time.h>
 
 /* TODO: implement sort_playlist */
 

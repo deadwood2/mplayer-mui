@@ -204,7 +204,7 @@ kk(KPrintF("TASK: sig_taskready: %d   sig_taskready %d\n", sig_taskready, sig_ta
    if( ( AHIMsgPort=CreateMsgPort() )) {
 	  if ( (AHIio=(struct AHIRequest *)CreateIORequest(AHIMsgPort,sizeof(struct AHIRequest)))) {
 		 AHIio->ahir_Version = 4;
-		 AHIDevice=OpenDevice(AHINAME, AHI_DEFAULTUNIT,(struct IORequest *)AHIio,NULL);
+		 AHIDevice=OpenDevice(AHINAME, AHI_DEFAULTUNIT,(struct IORequest *)AHIio,0);
 	  }
    }
 

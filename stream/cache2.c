@@ -75,6 +75,7 @@ static void *ThreadProc(void *s);
 #ifdef __MORPHOS__
 
 #include <errno.h>
+#include <time.h>
 #include <clib/debug_protos.h>
 #include <exec/ports.h>
 #include <exec/tasks.h>

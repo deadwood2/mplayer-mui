@@ -51,7 +51,8 @@
 #if !HAVE_SOCKLEN_T
 typedef int socklen_t;
 #endif
-#if __MORPHOS__
+#ifdef __MORPHOS__
+#include <proto/socket.h>
 void socket_block(int socket_fd, char val);
 int myrecv(int socket_fd, unsigned char *buf, int size, int flag);
 int mysend(int socket_fd, unsigned char *buf, int size, int flag);

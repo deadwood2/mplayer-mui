@@ -32,6 +32,10 @@
 #include <winsock2.h>
 #endif
 
+#ifdef __MORPHOS__
+extern struct Library *SocketBase;
+#endif
+
 #include "mp_msg.h"
 #include "network.h"
 #include "stream.h"
@@ -401,7 +405,7 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
 
 #ifdef __MORPHOS__
    if (!SocketBase)
-	  if ( ! (SocketBase = OpenLibrary("bsdsocket.library", 0L) ) ) return NULL;
+	  if ( ! (SocketBase = OpenLibrary("bsdsocket.library", 0L) ) ) return STREAM_ERROR;
 #endif
 
   if(mode != STREAM_READ) {

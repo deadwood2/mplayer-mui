@@ -57,6 +57,10 @@
 #include <dos/dostags.h>
 #include <dos/dos.h>
 
+#if defined(__AROS__)
+#include <proto/arossupport.h>
+#endif
+
 static vo_info_t info =
 {
 	"CyberGraphX video output (WPA)",
