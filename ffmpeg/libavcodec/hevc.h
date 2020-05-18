@@ -609,7 +609,7 @@ typedef struct SliceHeader {
 
     unsigned int max_num_merge_cand; ///< 5 - 5_minus_max_num_merge_cand
 
-    int *entry_point_offset;
+    unsigned *entry_point_offset;
     int * offset;
     int * size;
     int num_entry_point_offsets;
@@ -819,6 +819,8 @@ typedef struct HEVCContext {
     AVBufferRef *sps_list[MAX_SPS_COUNT];
     AVBufferRef *pps_list[MAX_PPS_COUNT];
 
+    AVBufferRef *current_sps;
+
     AVBufferPool *tab_mvf_pool;
     AVBufferPool *rpl_tab_pool;
 
@@ -842,6 +844,7 @@ typedef struct HEVCContext {
     int bs_height;
 
     int is_decoded;
+    int no_rasl_output_flag;
 
     HEVCPredContext hpc;
     HEVCDSPContext hevcdsp;

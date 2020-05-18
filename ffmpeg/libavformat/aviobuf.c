@@ -359,6 +359,8 @@ static inline int put_str16(AVIOContext *s, const char *str, const int be)
 invalid:
         av_log(s, AV_LOG_ERROR, "Invaid UTF8 sequence in avio_put_str16%s\n", be ? "be" : "le");
         err = AVERROR(EINVAL);
+        if (!*(q-1))
+            break;
     }
     if (be)
         avio_wb16(s, 0);
@@ -778,9 +780,7 @@ int ffio_fdopen(AVIOContext **s, URLContext *h)
         return AVERROR(ENOMEM);
 
     *s = avio_alloc_context(buffer, buffer_size, h->flags & AVIO_FLAG_WRITE, h,
-                            (int (*)(void *, uint8_t *, int)) ffurl_read,
-                            (int (*)(void *, uint8_t *, int)) ffurl_write,
-                            (int64_t (*)(void *, int64_t, int)) ffurl_seek);
+                            (void*)ffurl_read, (void*)ffurl_write, (void*)ffurl_seek);
     if (!*s) {
         av_free(buffer);
         return AVERROR(ENOMEM);
@@ -802,10 +802,11 @@ int ffio_ensure_seekback(AVIOContext *s, int64_t buf_size)
     int max_buffer_size = s->max_packet_size ?
                           s->max_packet_size : IO_BUFFER_SIZE;
     int filled = s->buf_end - s->buffer;
+    ptrdiff_t checksum_ptr_offset = s->checksum_ptr ? s->checksum_ptr - s->buffer : -1;
 
     buf_size += s->buf_ptr - s->buffer + max_buffer_size;
 
-    if (buf_size < filled || s->seekable || !s->read_packet)
+    if (buf_size < filled || s->seekable)
         return 0;
     av_assert0(!s->write_flag);
 
@@ -819,6 +820,8 @@ int ffio_ensure_seekback(AVIOContext *s, int64_t buf_size)
     s->buf_end = buffer + (s->buf_end - s->buffer);
     s->buffer = buffer;
     s->buffer_size = buf_size;
+    if (checksum_ptr_offset >= 0)
+        s->checksum_ptr = s->buffer + checksum_ptr_offset;
     return 0;
 }
 
@@ -916,12 +919,6 @@ int avio_open2(AVIOContext **s, const char *filename, int flags,
         return err;
     }
     return 0;
-}
-
-int ffio_open2_wrapper(struct AVFormatContext *s, AVIOContext **pb, const char *url, int flags,
-                       const AVIOInterruptCB *int_cb, AVDictionary **options)
-{
-    return avio_open2(pb, url, flags, int_cb, options);
 }
 
 int avio_close(AVIOContext *s)

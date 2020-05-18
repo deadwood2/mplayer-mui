@@ -42,7 +42,6 @@ typedef enum AACCoder {
 typedef struct AACEncOptions {
     int stereo_mode;
     int aac_coder;
-    int pns;
 } AACEncOptions;
 
 struct AACEncContext;

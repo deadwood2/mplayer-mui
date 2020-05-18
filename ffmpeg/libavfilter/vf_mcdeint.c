@@ -69,8 +69,8 @@ enum MCDeintParity {
 
 typedef struct {
     const AVClass *class;
-    int mode;           ///< MCDeintMode
-    int parity;         ///< MCDeintParity
+    enum MCDeintMode mode;
+    enum MCDeintParity parity;
     int qp;
     AVCodecContext *enc_ctx;
 } MCDeintContext;
@@ -160,13 +160,13 @@ static av_cold void uninit(AVFilterContext *ctx)
 
 static int query_formats(AVFilterContext *ctx)
 {
-    static const enum AVPixelFormat pix_fmts[] = {
+    static const enum PixelFormat pix_fmts[] = {
         AV_PIX_FMT_YUV420P, AV_PIX_FMT_NONE
     };
-    AVFilterFormats *fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+
+    return 0;
 }
 
 static int filter_frame(AVFilterLink *inlink, AVFrame *inpic)

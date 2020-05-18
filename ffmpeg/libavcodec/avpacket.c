@@ -58,6 +58,7 @@ void av_init_packet(AVPacket *pkt)
 #if FF_API_DESTRUCT_PACKET
 FF_DISABLE_DEPRECATION_WARNINGS
     pkt->destruct             = NULL;
+    pkt->priv                 = NULL;
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
     pkt->buf                  = NULL;
@@ -336,29 +337,6 @@ uint8_t *av_packet_get_side_data(AVPacket *pkt, enum AVPacketSideDataType type,
     return NULL;
 }
 
-const char *av_packet_side_data_name(enum AVPacketSideDataType type)
-{
-    switch(type) {
-    case AV_PKT_DATA_PALETTE:                   return "Palette";
-    case AV_PKT_DATA_NEW_EXTRADATA:             return "New Extradata";
-    case AV_PKT_DATA_PARAM_CHANGE:              return "Param Change";
-    case AV_PKT_DATA_H263_MB_INFO:              return "H263 MB Info";
-    case AV_PKT_DATA_REPLAYGAIN:                return "Replay Gain";
-    case AV_PKT_DATA_DISPLAYMATRIX:             return "Display Matrix";
-    case AV_PKT_DATA_STEREO3D:                  return "Stereo 3D";
-    case AV_PKT_DATA_AUDIO_SERVICE_TYPE:        return "Audio Service Type";
-    case AV_PKT_DATA_SKIP_SAMPLES:              return "Skip Samples";
-    case AV_PKT_DATA_JP_DUALMONO:               return "JP Dual Mono";
-    case AV_PKT_DATA_STRINGS_METADATA:          return "Strings Metadata";
-    case AV_PKT_DATA_SUBTITLE_POSITION:         return "Subtitle Position";
-    case AV_PKT_DATA_MATROSKA_BLOCKADDITIONAL:  return "Matroska BlockAdditional";
-    case AV_PKT_DATA_WEBVTT_IDENTIFIER:         return "WebVTT ID";
-    case AV_PKT_DATA_WEBVTT_SETTINGS:           return "WebVTT Settings";
-    case AV_PKT_DATA_METADATA_UPDATE:           return "Metadata Update";
-    }
-    return NULL;
-}
-
 #define FF_MERGE_MARKER 0x8c4d9d108e25e9feULL
 
 int av_packet_merge_side_data(AVPacket *pkt){
@@ -410,10 +388,12 @@ int av_packet_split_side_data(AVPacket *pkt){
         p = pkt->data + pkt->size - 8 - 5;
         for (i=1; ; i++){
             size = AV_RB32(p);
-            if (size>INT_MAX || p - pkt->data < size)
+            if (size>INT_MAX - 5 || p - pkt->data < size)
                 return 0;
             if (p[4]&128)
                 break;
+            if (p - pkt->data < size + 5)
+                return 0;
             p-= size+5;
         }
 
@@ -424,7 +404,7 @@ int av_packet_split_side_data(AVPacket *pkt){
         p= pkt->data + pkt->size - 8 - 5;
         for (i=0; ; i++){
             size= AV_RB32(p);
-            av_assert0(size<=INT_MAX && p - pkt->data >= size);
+            av_assert0(size<=INT_MAX - 5 && p - pkt->data >= size);
             pkt->side_data[i].data = av_mallocz(size + FF_INPUT_BUFFER_PADDING_SIZE);
             pkt->side_data[i].size = size;
             pkt->side_data[i].type = p[4]&127;

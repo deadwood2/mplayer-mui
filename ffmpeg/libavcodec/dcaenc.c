@@ -847,7 +847,8 @@ static void put_subframe_samples(DCAEncContext *c, int ss, int band, int ch)
         int i;
         for (i = 0; i < 8; i++) {
             int bits = bit_consumption[c->abits[band][ch]] / 16;
-            put_sbits(&c->pb, bits, c->quantized[ss * 8 + i][band][ch]);
+            int32_t mask = (1 << bits) - 1;
+            put_bits(&c->pb, bits, c->quantized[ss * 8 + i][band][ch] & mask);
         }
     }
 }
@@ -937,6 +938,10 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
     put_primary_audio_header(c);
     for (i = 0; i < SUBFRAMES; i++)
         put_subframe(c, i);
+
+
+    for (i = put_bits_count(&c->pb); i < 8*c->frame_size; i++)
+        put_bits(&c->pb, 1, 0);
 
     flush_put_bits(&c->pb);
 

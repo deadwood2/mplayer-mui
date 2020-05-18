@@ -173,6 +173,8 @@ av_cold int swr_init(struct SwrContext *s){
     s-> in_ch_layout = s-> user_in_ch_layout;
     s->out_ch_layout = s->user_out_ch_layout;
 
+    s->int_sample_fmt= s->user_int_sample_fmt;
+
     if(av_get_channel_layout_nb_channels(s-> in_ch_layout) > SWR_CH_MAX) {
         av_log(s, AV_LOG_WARNING, "Input channel layout 0x%"PRIx64" is invalid or unsupported.\n", s-> in_ch_layout);
         s->in_ch_layout = 0;
@@ -254,6 +256,10 @@ av_cold int swr_init(struct SwrContext *s){
 
     if (s->out_sample_rate!=s->in_sample_rate || (s->flags & SWR_FLAG_RESAMPLE)){
         s->resample = s->resampler->init(s->resample, s->out_sample_rate, s->in_sample_rate, s->filter_size, s->phase_shift, s->linear_interp, s->cutoff, s->int_sample_fmt, s->filter_type, s->kaiser_beta, s->precision, s->cheby);
+        if (!s->resample) {
+            av_log(s, AV_LOG_ERROR, "Failed to initilaize resampler\n");
+            return AVERROR(ENOMEM);
+        }
     }else
         s->resampler->free(&s->resample);
     if(    s->int_sample_fmt != AV_SAMPLE_FMT_S16P
@@ -262,7 +268,8 @@ av_cold int swr_init(struct SwrContext *s){
         && s->int_sample_fmt != AV_SAMPLE_FMT_DBLP
         && s->resample){
         av_log(s, AV_LOG_ERROR, "Resampling only supported with internal s16/s32/flt/dbl\n");
-        return -1;
+        ret = AVERROR(EINVAL);
+        goto fail;
     }
 
 #define RSC 1 //FIXME finetune
@@ -276,24 +283,28 @@ av_cold int swr_init(struct SwrContext *s){
     if(!s-> in.ch_count){
         av_assert0(!s->in_ch_layout);
         av_log(s, AV_LOG_ERROR, "Input channel count and layout are unset\n");
-        return -1;
+        ret = AVERROR(EINVAL);
+        goto fail;
     }
 
     av_get_channel_layout_string(l1, sizeof(l1), s-> in.ch_count, s-> in_ch_layout);
     av_get_channel_layout_string(l2, sizeof(l2), s->out.ch_count, s->out_ch_layout);
     if (s->out_ch_layout && s->out.ch_count != av_get_channel_layout_nb_channels(s->out_ch_layout)) {
         av_log(s, AV_LOG_ERROR, "Output channel layout %s mismatches specified channel count %d\n", l2, s->out.ch_count);
-        return AVERROR(EINVAL);
+        ret = AVERROR(EINVAL);
+        goto fail;
     }
     if (s->in_ch_layout && s->used_ch_count != av_get_channel_layout_nb_channels(s->in_ch_layout)) {
         av_log(s, AV_LOG_ERROR, "Input channel layout %s mismatches specified channel count %d\n", l1, s->used_ch_count);
-        return AVERROR(EINVAL);
+        ret = AVERROR(EINVAL);
+        goto fail;
     }
 
     if ((!s->out_ch_layout || !s->in_ch_layout) && s->used_ch_count != s->out.ch_count && !s->rematrix_custom) {
         av_log(s, AV_LOG_ERROR, "Rematrix is needed between %s and %s "
                "but there is not enough information to do it\n", l1, l2);
-        return -1;
+        ret = AVERROR(EINVAL);
+        goto fail;
     }
 
 av_assert0(s->used_ch_count);
@@ -315,8 +326,10 @@ av_assert0(s->out.ch_count);
     s->out_convert= swri_audio_convert_alloc(s->out_sample_fmt,
                                              s->int_sample_fmt, s->out.ch_count, NULL, 0);
 
-    if (!s->in_convert || !s->out_convert)
-        return AVERROR(ENOMEM);
+    if (!s->in_convert || !s->out_convert) {
+        ret = AVERROR(ENOMEM);
+        goto fail;
+    }
 
     s->postin= s->in;
     s->preout= s->out;
@@ -343,12 +356,19 @@ av_assert0(s->out.ch_count);
     }
 
     if ((ret = swri_dither_init(s, s->out_sample_fmt, s->int_sample_fmt)) < 0)
-        return ret;
+        goto fail;
 
-    if(s->rematrix || s->dither.method)
-        return swri_rematrix_init(s);
+    if(s->rematrix || s->dither.method) {
+        ret = swri_rematrix_init(s);
+        if (ret < 0)
+            goto fail;
+    }
 
     return 0;
+fail:
+    swr_close(s);
+    return ret;
+
 }
 
 int swri_realloc_audio(AudioData *a, int count){
@@ -369,7 +389,7 @@ int swri_realloc_audio(AudioData *a, int count){
     av_assert0(a->bps);
     av_assert0(a->ch_count);
 
-    a->data= av_mallocz_array(countb, a->ch_count);
+    a->data= av_mallocz(countb*a->ch_count);
     if(!a->data)
         return AVERROR(ENOMEM);
     for(i=0; i<a->ch_count; i++){
@@ -623,7 +643,8 @@ static int swr_convert_internal(struct SwrContext *s, AudioData *out, int out_co
                 return ret;
             if(ret)
                 for(ch=0; ch<s->dither.noise.ch_count; ch++)
-                    swri_get_dither(s, s->dither.noise.ch[ch], s->dither.noise.count, 12345678913579<<ch, s->dither.noise.fmt);
+                    if((ret=swri_get_dither(s, s->dither.noise.ch[ch], s->dither.noise.count, (12345678913579ULL*ch + 3141592) % 2718281828U, s->dither.noise.fmt))<0)
+                        return ret;
             av_assert0(s->dither.noise.ch_count == preout->ch_count);
 
             if(s->dither.noise_pos + out_count > s->dither.noise.count)

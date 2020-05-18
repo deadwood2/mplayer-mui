@@ -1288,6 +1288,83 @@ fail:
     return AVERROR(ENOMEM);
 }
 
+static void clear_context(MpegEncContext *s)
+{
+    int i, j, k;
+
+    memset(&s->next_picture, 0, sizeof(s->next_picture));
+    memset(&s->last_picture, 0, sizeof(s->last_picture));
+    memset(&s->current_picture, 0, sizeof(s->current_picture));
+    memset(&s->new_picture, 0, sizeof(s->new_picture));
+
+    memset(s->thread_context, 0, sizeof(s->thread_context));
+
+    s->me.map = NULL;
+    s->me.score_map = NULL;
+    s->dct_error_sum = NULL;
+    s->block = NULL;
+    s->blocks = NULL;
+    memset(s->pblocks, 0, sizeof(s->pblocks));
+    s->ac_val_base = NULL;
+    s->ac_val[0] =
+    s->ac_val[1] =
+    s->ac_val[2] =NULL;
+    s->edge_emu_buffer = NULL;
+    s->me.scratchpad = NULL;
+    s->me.temp =
+    s->rd_scratchpad =
+    s->b_scratchpad =
+    s->obmc_scratchpad = NULL;
+
+    s->parse_context.buffer = NULL;
+    s->parse_context.buffer_size = 0;
+    s->parse_context.overread = 0;
+    s->bitstream_buffer = NULL;
+    s->allocated_bitstream_buffer_size = 0;
+    s->picture          = NULL;
+    s->mb_type          = NULL;
+    s->p_mv_table_base  = NULL;
+    s->b_forw_mv_table_base = NULL;
+    s->b_back_mv_table_base = NULL;
+    s->b_bidir_forw_mv_table_base = NULL;
+    s->b_bidir_back_mv_table_base = NULL;
+    s->b_direct_mv_table_base = NULL;
+    s->p_mv_table            = NULL;
+    s->b_forw_mv_table       = NULL;
+    s->b_back_mv_table       = NULL;
+    s->b_bidir_forw_mv_table = NULL;
+    s->b_bidir_back_mv_table = NULL;
+    s->b_direct_mv_table     = NULL;
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < 2; j++) {
+            for (k = 0; k < 2; k++) {
+                s->b_field_mv_table_base[i][j][k] = NULL;
+                s->b_field_mv_table[i][j][k] = NULL;
+            }
+            s->b_field_select_table[i][j] = NULL;
+            s->p_field_mv_table_base[i][j] = NULL;
+            s->p_field_mv_table[i][j] = NULL;
+        }
+        s->p_field_select_table[i] = NULL;
+    }
+
+    s->dc_val_base = NULL;
+    s->coded_block_base = NULL;
+    s->mbintra_table = NULL;
+    s->cbp_table = NULL;
+    s->pred_dir_table = NULL;
+
+    s->mbskip_table = NULL;
+
+    s->er.error_status_table = NULL;
+    s->er.er_temp_buffer = NULL;
+    s->mb_index2xy = NULL;
+    s->lambda_table = NULL;
+
+    s->cplx_tab = NULL;
+    s->bits_tab = NULL;
+}
+
 /**
  * init common structure for both encoder and decoder.
  * this assumes that some variables like width/height are already set
@@ -1298,6 +1375,8 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
     int nb_slices = (HAVE_THREADS &&
                      s->avctx->active_thread_type & FF_THREAD_SLICE) ?
                     s->avctx->thread_count : 1;
+
+    clear_context(s);
 
     if (s->encoding && s->avctx->slices)
         nb_slices = s->avctx->slices;
@@ -1346,10 +1425,6 @@ av_cold int ff_mpv_common_init(MpegEncContext *s)
         if (!s->picture[i].f)
             goto fail;
     }
-    memset(&s->next_picture, 0, sizeof(s->next_picture));
-    memset(&s->last_picture, 0, sizeof(s->last_picture));
-    memset(&s->current_picture, 0, sizeof(s->current_picture));
-    memset(&s->new_picture, 0, sizeof(s->new_picture));
     s->next_picture.f = av_frame_alloc();
     if (!s->next_picture.f)
         goto fail;
@@ -1852,7 +1927,7 @@ int ff_mpv_frame_start(MpegEncContext *s, AVCodecContext *avctx)
         if (!s->droppable)
             s->next_picture_ptr = s->current_picture_ptr;
     }
-    ff_dlog(s->avctx, "L%p N%p C%p L%p N%p C%p type:%d drop:%d\n",
+    av_dlog(s->avctx, "L%p N%p C%p L%p N%p C%p type:%d drop:%d\n",
             s->last_picture_ptr, s->next_picture_ptr,s->current_picture_ptr,
             s->last_picture_ptr    ? s->last_picture_ptr->f->data[0]    : NULL,
             s->next_picture_ptr    ? s->next_picture_ptr->f->data[0]    : NULL,
@@ -1896,13 +1971,11 @@ int ff_mpv_frame_start(MpegEncContext *s, AVCodecContext *avctx)
             for(i=0; i<avctx->height; i++)
                 memset(s->last_picture_ptr->f->data[0] + s->last_picture_ptr->f->linesize[0]*i,
                        0x80, avctx->width);
-            if (s->last_picture_ptr->f->data[2]) {
-                for(i=0; i<FF_CEIL_RSHIFT(avctx->height, v_chroma_shift); i++) {
-                    memset(s->last_picture_ptr->f->data[1] + s->last_picture_ptr->f->linesize[1]*i,
-                        0x80, FF_CEIL_RSHIFT(avctx->width, h_chroma_shift));
-                    memset(s->last_picture_ptr->f->data[2] + s->last_picture_ptr->f->linesize[2]*i,
-                        0x80, FF_CEIL_RSHIFT(avctx->width, h_chroma_shift));
-                }
+            for(i=0; i<FF_CEIL_RSHIFT(avctx->height, v_chroma_shift); i++) {
+                memset(s->last_picture_ptr->f->data[1] + s->last_picture_ptr->f->linesize[1]*i,
+                       0x80, FF_CEIL_RSHIFT(avctx->width, h_chroma_shift));
+                memset(s->last_picture_ptr->f->data[2] + s->last_picture_ptr->f->linesize[2]*i,
+                       0x80, FF_CEIL_RSHIFT(avctx->width, h_chroma_shift));
             }
 
             if(s->codec_id == AV_CODEC_ID_FLV1 || s->codec_id == AV_CODEC_ID_H263){
@@ -2251,7 +2324,7 @@ void ff_print_debug_info2(AVCodecContext *avctx, AVFrame *pict, uint8_t *mbskip_
         for (y = 0; y < mb_height; y++) {
             for (x = 0; x < mb_width; x++) {
                 if (avctx->debug & FF_DEBUG_SKIP) {
-                    int count = mbskip_table ? mbskip_table[x + y * mb_stride] : 0;
+                    int count = mbskip_table[x + y * mb_stride];
                     if (count > 9)
                         count = 9;
                     av_log(avctx, AV_LOG_DEBUG, "%1d", count);
@@ -2520,8 +2593,7 @@ void ff_print_debug_info2(AVCodecContext *avctx, AVFrame *pict, uint8_t *mbskip_
                         // hmm
                     }
                 }
-                if (mbskip_table)
-                    mbskip_table[mb_index] = 0;
+                mbskip_table[mb_index] = 0;
             }
         }
     }
@@ -2955,12 +3027,12 @@ int ff_mpv_lowest_referenced_row(MpegEncContext *s, int dir)
     }
 
     for (i = 0; i < mvs; i++) {
-        my = s->mv[dir][i][1];
+        my = s->mv[dir][i][1]<<qpel_shift;
         my_max = FFMAX(my_max, my);
         my_min = FFMIN(my_min, my);
     }
 
-    off = ((FFMAX(-my_min, my_max)<<qpel_shift) + 63) >> 6;
+    off = (FFMAX(-my_min, my_max) + 63) >> 6;
 
     return FFMIN(FFMAX(s->mb_y + off, 0), s->mb_height-1);
 unhandled:
@@ -3278,10 +3350,8 @@ void mpv_decode_mb_internal(MpegEncContext *s, int16_t block[12][64],
 skip_idct:
         if(!readable){
             s->hdsp.put_pixels_tab[0][0](s->dest[0], dest_y ,   linesize,16);
-            if (!CONFIG_GRAY || !(s->flags & CODEC_FLAG_GRAY)) {
-                s->hdsp.put_pixels_tab[s->chroma_x_shift][0](s->dest[1], dest_cb, uvlinesize,16 >> s->chroma_y_shift);
-                s->hdsp.put_pixels_tab[s->chroma_x_shift][0](s->dest[2], dest_cr, uvlinesize,16 >> s->chroma_y_shift);
-            }
+            s->hdsp.put_pixels_tab[s->chroma_x_shift][0](s->dest[1], dest_cb, uvlinesize,16 >> s->chroma_y_shift);
+            s->hdsp.put_pixels_tab[s->chroma_x_shift][0](s->dest[2], dest_cr, uvlinesize,16 >> s->chroma_y_shift);
         }
     }
 }
@@ -3318,9 +3388,9 @@ void ff_init_block_index(MpegEncContext *s){ //FIXME maybe rename
     s->block_index[5]= s->mb_stride*(s->mb_y + s->mb_height + 2) + s->b8_stride*s->mb_height*2 + s->mb_x - 1;
     //block_index is not used by mpeg2, so it is not affected by chroma_format
 
-    s->dest[0] = s->current_picture.f->data[0] + (int)((s->mb_x - 1U) <<  mb_size);
-    s->dest[1] = s->current_picture.f->data[1] + (int)((s->mb_x - 1U) << (mb_size - s->chroma_x_shift));
-    s->dest[2] = s->current_picture.f->data[2] + (int)((s->mb_x - 1U) << (mb_size - s->chroma_x_shift));
+    s->dest[0] = s->current_picture.f->data[0] + ((s->mb_x - 1) <<  mb_size);
+    s->dest[1] = s->current_picture.f->data[1] + ((s->mb_x - 1) << (mb_size - s->chroma_x_shift));
+    s->dest[2] = s->current_picture.f->data[2] + ((s->mb_x - 1) << (mb_size - s->chroma_x_shift));
 
     if(!(s->pict_type==AV_PICTURE_TYPE_B && s->avctx->draw_horiz_band && s->picture_structure==PICT_FRAME))
     {

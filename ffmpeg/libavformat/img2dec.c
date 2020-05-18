@@ -177,7 +177,7 @@ static int img_read_probe(AVProbeData *p)
 int ff_img_read_header(AVFormatContext *s1)
 {
     VideoDemuxData *s = s1->priv_data;
-    int first_index = 1, last_index = 1;
+    int first_index, last_index;
     AVStream *st;
     enum AVPixelFormat pix_fmt = AV_PIX_FMT_NONE;
 
@@ -282,7 +282,7 @@ int ff_img_read_header(AVFormatContext *s1)
                    "is not supported by this libavformat build\n");
             return AVERROR(ENOSYS);
 #endif
-        } else if (s->pattern_type != PT_GLOB_SEQUENCE && s->pattern_type != PT_NONE) {
+        } else if (s->pattern_type != PT_GLOB_SEQUENCE) {
             av_log(s1, AV_LOG_ERROR,
                    "Unknown value '%d' for pattern_type option\n", s->pattern_type);
             return AVERROR(EINVAL);
@@ -377,9 +377,7 @@ int ff_img_read_packet(AVFormatContext *s1, AVPacket *pkt)
         }
         if (s->img_number > s->img_last)
             return AVERROR_EOF;
-        if (s->pattern_type == PT_NONE) {
-            av_strlcpy(filename_bytes, s->path, sizeof(filename_bytes));
-        } else if (s->use_glob) {
+        if (s->use_glob) {
 #if HAVE_GLOB
             filename = s->globstate.gl_pathv[s->img_number];
 #endif
@@ -444,14 +442,17 @@ int ff_img_read_packet(AVFormatContext *s1, AVPacket *pkt)
     }
 
     res = av_new_packet(pkt, size[0] + size[1] + size[2]);
-    if (res < 0)
-        return res;
+    if (res < 0) {
+        goto fail;
+    }
     pkt->stream_index = 0;
     pkt->flags       |= AV_PKT_FLAG_KEY;
     if (s->ts_from_file) {
         struct stat img_stat;
-        if (stat(filename, &img_stat))
-            return AVERROR(EIO);
+        if (stat(filename, &img_stat)) {
+            res = AVERROR(EIO);
+            goto fail;
+        }
         pkt->pts = (int64_t)img_stat.st_mtime;
 #if HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
         if (s->ts_from_file == 2)
@@ -485,18 +486,29 @@ int ff_img_read_packet(AVFormatContext *s1, AVPacket *pkt)
     if (ret[0] <= 0 || ret[1] < 0 || ret[2] < 0) {
         av_free_packet(pkt);
         if (ret[0] < 0) {
-            return ret[0];
+            res = ret[0];
         } else if (ret[1] < 0) {
-            return ret[1];
-        } else if (ret[2] < 0)
-            return ret[2];
-        return AVERROR_EOF;
+            res = ret[1];
+        } else if (ret[2] < 0) {
+            res = ret[2];
+        } else {
+            res = AVERROR_EOF;
+        }
+        goto fail;
     } else {
         s->img_count++;
         s->img_number++;
         s->pts++;
         return 0;
     }
+
+fail:
+    if (!s->is_pipe) {
+        for (i = 0; i < 3; i++) {
+            avio_closep(&f[i]);
+        }
+    }
+    return res;
 }
 
 static int img_read_close(struct AVFormatContext* s1)
@@ -540,7 +552,6 @@ const AVOption ff_img_options[] = {
     { "glob_sequence","select glob/sequence pattern type",   0, AV_OPT_TYPE_CONST,  {.i64=PT_GLOB_SEQUENCE}, INT_MIN, INT_MAX, DEC, "pattern_type" },
     { "glob",         "select glob pattern type",            0, AV_OPT_TYPE_CONST,  {.i64=PT_GLOB         }, INT_MIN, INT_MAX, DEC, "pattern_type" },
     { "sequence",     "select sequence pattern type",        0, AV_OPT_TYPE_CONST,  {.i64=PT_SEQUENCE     }, INT_MIN, INT_MAX, DEC, "pattern_type" },
-    { "none",         "disable pattern matching",            0, AV_OPT_TYPE_CONST,  {.i64=PT_NONE         }, INT_MIN, INT_MAX, DEC, "pattern_type" },
 
     { "pixel_format", "set video pixel format",              OFFSET(pixel_format), AV_OPT_TYPE_STRING, {.str = NULL}, 0, 0,       DEC },
     { "start_number", "set first number in the sequence",    OFFSET(start_number), AV_OPT_TYPE_INT,    {.i64 = 0   }, INT_MIN, INT_MAX, DEC },
@@ -710,16 +721,6 @@ static int jpegls_probe(AVProbeData *p)
     return 0;
 }
 
-static int qdraw_probe(AVProbeData *p)
-{
-    const uint8_t *b = p->buf;
-
-    if (!b[10] && AV_RB32(b+11) == 0x1102ff0c && !b[15] ||
-        p->buf_size >= 528 && !b[522] && AV_RB32(b+523) == 0x1102ff0c && !b[527])
-        return AVPROBE_SCORE_EXTENSION + 1;
-    return 0;
-}
-
 static int pictor_probe(AVProbeData *p)
 {
     const uint8_t *b = p->buf;
@@ -806,7 +807,6 @@ IMAGEAUTO_DEMUXER(jpeg,    AV_CODEC_ID_MJPEG)
 IMAGEAUTO_DEMUXER(jpegls,  AV_CODEC_ID_JPEGLS)
 IMAGEAUTO_DEMUXER(pictor,  AV_CODEC_ID_PICTOR)
 IMAGEAUTO_DEMUXER(png,     AV_CODEC_ID_PNG)
-IMAGEAUTO_DEMUXER(qdraw,   AV_CODEC_ID_QDRAW)
 IMAGEAUTO_DEMUXER(sgi,     AV_CODEC_ID_SGI)
 IMAGEAUTO_DEMUXER(sunrast, AV_CODEC_ID_SUNRAST)
 IMAGEAUTO_DEMUXER(tiff,    AV_CODEC_ID_TIFF)

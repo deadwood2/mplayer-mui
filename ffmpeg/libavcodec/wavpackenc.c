@@ -128,6 +128,11 @@ static av_cold int wavpack_encode_init(AVCodecContext *avctx)
 
     s->avctx = avctx;
 
+    if (avctx->channels > 255) {
+        av_log(avctx, AV_LOG_ERROR, "Invalid channel count: %d\n", avctx->channels);
+        return AVERROR(EINVAL);
+    }
+
     if (!avctx->frame_size) {
         int block_samples;
         if (!(avctx->sample_rate & 1))
@@ -2143,6 +2148,7 @@ static void pack_int32(WavPackEncodeContext *s,
                        int nb_samples)
 {
     const int sent_bits = s->int32_sent_bits;
+    int32_t value, mask = (1 << sent_bits) - 1;
     PutBitContext *pb = &s->pb;
     int i, pre_shift;
 
@@ -2153,12 +2159,15 @@ static void pack_int32(WavPackEncodeContext *s,
 
     if (s->flags & WV_MONO_DATA) {
         for (i = 0; i < nb_samples; i++) {
-            put_sbits(pb, sent_bits, samples_l[i] >> pre_shift);
+            value = (samples_l[i] >> pre_shift) & mask;
+            put_bits(pb, sent_bits, value);
         }
     } else {
         for (i = 0; i < nb_samples; i++) {
-            put_sbits(pb, sent_bits, samples_l[i] >> pre_shift);
-            put_sbits(pb, sent_bits, samples_r[i] >> pre_shift);
+            value = (samples_l[i] >> pre_shift) & mask;
+            put_bits(pb, sent_bits, value);
+            value = (samples_r[i] >> pre_shift) & mask;
+            put_bits(pb, sent_bits, value);
         }
     }
 }
@@ -2878,7 +2887,7 @@ static int wavpack_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
     }
 
     buf_size = s->block_samples * avctx->channels * 8
-             + 200 /* for headers */;
+             + 200 * avctx->channels /* for headers */;
     if ((ret = ff_alloc_packet2(avctx, avpkt, buf_size)) < 0)
         return ret;
     buf = avpkt->data;

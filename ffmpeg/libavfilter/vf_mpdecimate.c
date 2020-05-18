@@ -120,10 +120,13 @@ static int decimate_frame(AVFilterContext *ctx,
                         cur->data[plane], cur->linesize[plane],
                         ref->data[plane], ref->linesize[plane],
                         FF_CEIL_RSHIFT(ref->width,  hsub),
-                        FF_CEIL_RSHIFT(ref->height, vsub)))
+                        FF_CEIL_RSHIFT(ref->height, vsub))) {
+            emms_c();
             return 0;
+        }
     }
 
+    emms_c();
     return 1;
 }
 
@@ -158,10 +161,10 @@ static int query_formats(AVFilterContext *ctx)
         AV_PIX_FMT_YUVA420P,
         AV_PIX_FMT_NONE
     };
-    AVFilterFormats *fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+
+    return 0;
 }
 
 static int config_input(AVFilterLink *inlink)
@@ -188,7 +191,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *cur)
         decimate->ref = cur;
         decimate->drop_count = FFMIN(-1, decimate->drop_count-1);
 
-        if ((ret = ff_filter_frame(outlink, av_frame_clone(cur))) < 0)
+        if (ret = ff_filter_frame(outlink, av_frame_clone(cur)) < 0)
             return ret;
     }
 

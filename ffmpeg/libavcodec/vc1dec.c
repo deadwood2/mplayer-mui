@@ -465,7 +465,7 @@ static av_cold int vc1_decode_init(AVCodecContext *avctx)
         count = avctx->extradata_size*8 - get_bits_count(&gb);
         if (count > 0) {
             av_log(avctx, AV_LOG_INFO, "Extra data: %i bits left, value: %X\n",
-                   count, get_bits(&gb, count));
+                   count, get_bits_long(&gb, FFMIN(count, 32)));
         } else if (count < 0) {
             av_log(avctx, AV_LOG_INFO, "Read %i bits in overflow\n", -count);
         }
@@ -483,9 +483,6 @@ static av_cold int vc1_decode_init(AVCodecContext *avctx)
         }
 
         buf2  = av_mallocz(avctx->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
-        if (!buf2)
-            return AVERROR(ENOMEM);
-
         start = find_next_marker(start, end); // in WVC1 extradata first byte is its size, but can be 0 in mkv
         next  = start;
         for (; next < end; start = next) {
@@ -1004,7 +1001,7 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
                 FFSWAP(uint8_t *, v->mv_f_next[1], v->mv_f[1]);
             }
         }
-        ff_dlog(s->avctx, "Consumed %i/%i bits\n",
+        av_dlog(s->avctx, "Consumed %i/%i bits\n",
                 get_bits_count(&s->gb), s->gb.size_in_bits);
 //  if (get_bits_count(&s->gb) > buf_size * 8)
 //      return -1;

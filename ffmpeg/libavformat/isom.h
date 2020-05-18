@@ -186,7 +186,6 @@ typedef struct MOVContext {
     int chapter_track;
     int use_absolute_path;
     int ignore_editlist;
-    int seek_individually;
     int64_t next_root_atom; ///< offset of the next root atom
     int export_all;
     int export_xmp;
@@ -198,6 +197,7 @@ typedef struct MOVContext {
     MOVFragmentIndex** fragment_index_data;
     unsigned fragment_index_count;
     int atom_depth;
+    int enable_drefs;
 } MOVContext;
 
 int ff_mp4_read_descr_len(AVIOContext *pb);

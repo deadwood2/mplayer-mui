@@ -37,14 +37,13 @@
 #include <xcb/shape.h>
 #endif
 
-#include "libavutil/internal.h"
+#include "libavformat/avformat.h"
+#include "libavformat/internal.h"
+
 #include "libavutil/mathematics.h"
 #include "libavutil/opt.h"
 #include "libavutil/parseutils.h"
 #include "libavutil/time.h"
-
-#include "libavformat/avformat.h"
-#include "libavformat/internal.h"
 
 typedef struct XCBGrabContext {
     const AVClass *class;
@@ -643,7 +642,6 @@ static av_cold int xcbgrab_read_header(AVFormatContext *s)
                s->filename[0] ? s->filename : "default", ret);
         return AVERROR(EIO);
     }
-
     setup = xcb_get_setup(c->conn);
 
     c->screen = get_screen(setup, screen_num);

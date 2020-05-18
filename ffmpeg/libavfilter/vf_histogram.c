@@ -37,7 +37,7 @@ enum HistogramMode {
 
 typedef struct HistogramContext {
     const AVClass *class;               ///< AVClass context for log and options purpose
-    int mode;                           ///< HistogramMode
+    enum HistogramMode mode;
     unsigned       histogram[256];
     int            ncomp;
     const uint8_t  *bg_color;
@@ -105,7 +105,6 @@ static int query_formats(AVFilterContext *ctx)
 {
     HistogramContext *h = ctx->priv;
     const enum AVPixelFormat *pix_fmts;
-    AVFilterFormats *fmts_list;
 
     switch (h->mode) {
     case MODE_WAVEFORM:
@@ -122,10 +121,9 @@ static int query_formats(AVFilterContext *ctx)
         av_assert0(0);
     }
 
-    fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+
+    return 0;
 }
 
 static const uint8_t black_yuva_color[4] = { 0, 127, 127, 255 };

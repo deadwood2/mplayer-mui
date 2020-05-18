@@ -943,10 +943,10 @@ static int decode_audio_specific_config(AACContext *ac,
     GetBitContext gb;
     int i, ret;
 
-    ff_dlog(avctx, "audio specific config size %d\n", bit_size >> 3);
+    av_dlog(avctx, "audio specific config size %d\n", bit_size >> 3);
     for (i = 0; i < bit_size >> 3; i++)
-        ff_dlog(avctx, "%02x ", data[i]);
-    ff_dlog(avctx, "\n");
+        av_dlog(avctx, "%02x ", data[i]);
+    av_dlog(avctx, "\n");
 
     if ((ret = init_get_bits(&gb, data, bit_size)) < 0)
         return ret;
@@ -993,7 +993,7 @@ static int decode_audio_specific_config(AACContext *ac,
         return AVERROR(ENOSYS);
     }
 
-    ff_dlog(avctx,
+    av_dlog(avctx,
             "AOT %d chan config %d sampling index %d (%d) SBR %d PS %d\n",
             m4ac->object_type, m4ac->chan_config, m4ac->sampling_index,
             m4ac->sample_rate, m4ac->sbr,
@@ -1394,7 +1394,7 @@ static int decode_scalefactors(AACContext *ac, float sf[120], GetBitContext *gb,
                                int band_type_run_end[120])
 {
     int g, i, idx = 0;
-    int offset[3] = { global_gain, global_gain - NOISE_OFFSET, 0 };
+    int offset[3] = { global_gain, global_gain - 90, 0 };
     int clipped_offset;
     int noise_flag = 1;
     for (g = 0; g < ics->num_window_groups; g++) {
@@ -1406,7 +1406,7 @@ static int decode_scalefactors(AACContext *ac, float sf[120], GetBitContext *gb,
             } else if ((band_type[idx] == INTENSITY_BT) ||
                        (band_type[idx] == INTENSITY_BT2)) {
                 for (; i < run_end; i++, idx++) {
-                    offset[2] += get_vlc2(gb, vlc_scalefactors.table, 7, 3) - SCALE_DIFF_ZERO;
+                    offset[2] += get_vlc2(gb, vlc_scalefactors.table, 7, 3) - 60;
                     clipped_offset = av_clip(offset[2], -155, 100);
                     if (offset[2] != clipped_offset) {
                         avpriv_request_sample(ac->avctx,
@@ -1419,9 +1419,9 @@ static int decode_scalefactors(AACContext *ac, float sf[120], GetBitContext *gb,
             } else if (band_type[idx] == NOISE_BT) {
                 for (; i < run_end; i++, idx++) {
                     if (noise_flag-- > 0)
-                        offset[1] += get_bits(gb, NOISE_PRE_BITS) - NOISE_PRE;
+                        offset[1] += get_bits(gb, 9) - 256;
                     else
-                        offset[1] += get_vlc2(gb, vlc_scalefactors.table, 7, 3) - SCALE_DIFF_ZERO;
+                        offset[1] += get_vlc2(gb, vlc_scalefactors.table, 7, 3) - 60;
                     clipped_offset = av_clip(offset[1], -100, 155);
                     if (offset[1] != clipped_offset) {
                         avpriv_request_sample(ac->avctx,
@@ -1433,7 +1433,7 @@ static int decode_scalefactors(AACContext *ac, float sf[120], GetBitContext *gb,
                 }
             } else {
                 for (; i < run_end; i++, idx++) {
-                    offset[0] += get_vlc2(gb, vlc_scalefactors.table, 7, 3) - SCALE_DIFF_ZERO;
+                    offset[0] += get_vlc2(gb, vlc_scalefactors.table, 7, 3) - 60;
                     if (offset[0] > 255U) {
                         av_log(ac->avctx, AV_LOG_ERROR,
                                "Scalefactor (%d) out of range.\n", offset[0]);
@@ -2919,6 +2919,11 @@ static int aac_decode_er_frame(AVCodecContext *avctx, void *data,
 
     spectral_to_sample(ac);
 
+    if (!ac->frame->data[0] && samples) {
+        av_log(avctx, AV_LOG_ERROR, "no frame data found\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     ac->frame->nb_samples = samples;
     ac->frame->sample_rate = avctx->sample_rate;
     *got_frame_ptr = 1;
@@ -3079,6 +3084,7 @@ static int aac_decode_frame_int(AVCodecContext *avctx, void *data,
         goto fail;
     }
 
+    *got_frame_ptr = !!samples;
     if (samples) {
         ac->frame->nb_samples = samples;
         ac->frame->sample_rate = avctx->sample_rate;
@@ -3147,7 +3153,7 @@ static int aac_decode_frame(AVCodecContext *avctx, void *data,
     if (INT_MAX / 8 <= buf_size)
         return AVERROR_INVALIDDATA;
 
-    if ((err = init_get_bits(&gb, buf, buf_size * 8)) < 0)
+    if ((err = init_get_bits8(&gb, buf, buf_size)) < 0)
         return err;
 
     switch (ac->oc[1].m4ac.object_type) {

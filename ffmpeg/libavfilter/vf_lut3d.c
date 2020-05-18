@@ -58,7 +58,7 @@ struct rgbvec {
 
 typedef struct LUT3DContext {
     const AVClass *class;
-    int interpolation;          ///<interp_mode
+    enum interp_mode interpolation;
     char *file;
     uint8_t rgba_map[4];
     int step;
@@ -471,10 +471,8 @@ static int query_formats(AVFilterContext *ctx)
         AV_PIX_FMT_RGBA64, AV_PIX_FMT_BGRA64,
         AV_PIX_FMT_NONE
     };
-    AVFilterFormats *fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+    return 0;
 }
 
 static int config_input(AVFilterLink *inlink)

@@ -68,21 +68,10 @@ typedef struct {
     const AVClass *class;
     int yuv_convert[16][3][3];
     int interlaced;
-    int source, dest;        ///< ColorMode
+    enum ColorMode source, dest;
     int mode;
     int hsub, vsub;
 } ColorMatrixContext;
-
-typedef struct ThreadData {
-    AVFrame *dst;
-    const AVFrame *src;
-    int c2;
-    int c3;
-    int c4;
-    int c5;
-    int c6;
-    int c7;
-} ThreadData;
 
 #define OFFSET(x) offsetof(ColorMatrixContext, x)
 #define FLAGS AV_OPT_FLAG_VIDEO_PARAM|AV_OPT_FLAG_FILTERING_PARAM
@@ -190,28 +179,24 @@ static av_cold int init(AVFilterContext *ctx)
     return 0;
 }
 
-static int process_slice_uyvy422(AVFilterContext *ctx, void *arg, int jobnr, int nb_jobs)
+static void process_frame_uyvy422(ColorMatrixContext *color,
+                                  AVFrame *dst, AVFrame *src)
 {
-    const ThreadData *td = arg;
-    const AVFrame *src = td->src;
-    AVFrame *dst = td->dst;
+    const unsigned char *srcp = src->data[0];
+    const int src_pitch = src->linesize[0];
     const int height = src->height;
     const int width = src->width*2;
-    const int src_pitch = src->linesize[0];
+    unsigned char *dstp = dst->data[0];
     const int dst_pitch = dst->linesize[0];
-    const int slice_start = (height *  jobnr   ) / nb_jobs;
-    const int slice_end   = (height * (jobnr+1)) / nb_jobs;
-    const unsigned char *srcp = src->data[0] + slice_start * src_pitch;
-    unsigned char *dstp = dst->data[0] + slice_start * dst_pitch;
-    const int c2 = td->c2;
-    const int c3 = td->c3;
-    const int c4 = td->c4;
-    const int c5 = td->c5;
-    const int c6 = td->c6;
-    const int c7 = td->c7;
+    const int c2 = color->yuv_convert[color->mode][0][1];
+    const int c3 = color->yuv_convert[color->mode][0][2];
+    const int c4 = color->yuv_convert[color->mode][1][1];
+    const int c5 = color->yuv_convert[color->mode][1][2];
+    const int c6 = color->yuv_convert[color->mode][2][1];
+    const int c7 = color->yuv_convert[color->mode][2][2];
     int x, y;
 
-    for (y = slice_start; y < slice_end; y++) {
+    for (y = 0; y < height; y++) {
         for (x = 0; x < width; x += 4) {
             const int u = srcp[x + 0] - 128;
             const int v = srcp[x + 2] - 128;
@@ -224,38 +209,32 @@ static int process_slice_uyvy422(AVFilterContext *ctx, void *arg, int jobnr, int
         srcp += src_pitch;
         dstp += dst_pitch;
     }
-
-    return 0;
 }
 
-static int process_slice_yuv422p(AVFilterContext *ctx, void *arg, int jobnr, int nb_jobs)
+static void process_frame_yuv422p(ColorMatrixContext *color,
+                                  AVFrame *dst, AVFrame *src)
 {
-    const ThreadData *td = arg;
-    const AVFrame *src = td->src;
-    AVFrame *dst = td->dst;
-    const int height = src->height;
-    const int width = src->width;
-    const int slice_start = (height *  jobnr   ) / nb_jobs;
-    const int slice_end   = (height * (jobnr+1)) / nb_jobs;
+    const unsigned char *srcpU = src->data[1];
+    const unsigned char *srcpV = src->data[2];
+    const unsigned char *srcpY = src->data[0];
     const int src_pitchY  = src->linesize[0];
     const int src_pitchUV = src->linesize[1];
-    const unsigned char *srcpU = src->data[1] + slice_start * src_pitchUV;
-    const unsigned char *srcpV = src->data[2] + slice_start * src_pitchUV;
-    const unsigned char *srcpY = src->data[0] + slice_start * src_pitchY;
+    const int height = src->height;
+    const int width = src->width;
+    unsigned char *dstpU = dst->data[1];
+    unsigned char *dstpV = dst->data[2];
+    unsigned char *dstpY = dst->data[0];
     const int dst_pitchY  = dst->linesize[0];
     const int dst_pitchUV = dst->linesize[1];
-    unsigned char *dstpU = dst->data[1] + slice_start * dst_pitchUV;
-    unsigned char *dstpV = dst->data[2] + slice_start * dst_pitchUV;
-    unsigned char *dstpY = dst->data[0] + slice_start * dst_pitchY;
-    const int c2 = td->c2;
-    const int c3 = td->c3;
-    const int c4 = td->c4;
-    const int c5 = td->c5;
-    const int c6 = td->c6;
-    const int c7 = td->c7;
+    const int c2 = color->yuv_convert[color->mode][0][1];
+    const int c3 = color->yuv_convert[color->mode][0][2];
+    const int c4 = color->yuv_convert[color->mode][1][1];
+    const int c5 = color->yuv_convert[color->mode][1][2];
+    const int c6 = color->yuv_convert[color->mode][2][1];
+    const int c7 = color->yuv_convert[color->mode][2][2];
     int x, y;
 
-    for (y = slice_start; y < slice_end; y++) {
+    for (y = 0; y < height; y++) {
         for (x = 0; x < width; x += 2) {
             const int u = srcpU[x >> 1] - 128;
             const int v = srcpV[x >> 1] - 128;
@@ -272,40 +251,34 @@ static int process_slice_yuv422p(AVFilterContext *ctx, void *arg, int jobnr, int
         dstpU += dst_pitchUV;
         dstpV += dst_pitchUV;
     }
-
-    return 0;
 }
 
-static int process_slice_yuv420p(AVFilterContext *ctx, void *arg, int jobnr, int nb_jobs)
+static void process_frame_yuv420p(ColorMatrixContext *color,
+                                  AVFrame *dst, AVFrame *src)
 {
-    const ThreadData *td = arg;
-    const AVFrame *src = td->src;
-    AVFrame *dst = td->dst;
-    const int height = FFALIGN(src->height, 2) >> 1;
-    const int width = src->width;
-    const int slice_start = ((height *  jobnr   ) / nb_jobs) << 1;
-    const int slice_end   = ((height * (jobnr+1)) / nb_jobs) << 1;
+    const unsigned char *srcpU = src->data[1];
+    const unsigned char *srcpV = src->data[2];
+    const unsigned char *srcpY = src->data[0];
+    const unsigned char *srcpN = src->data[0] + src->linesize[0];
     const int src_pitchY  = src->linesize[0];
     const int src_pitchUV = src->linesize[1];
+    const int height = src->height;
+    const int width = src->width;
+    unsigned char *dstpU = dst->data[1];
+    unsigned char *dstpV = dst->data[2];
+    unsigned char *dstpY = dst->data[0];
+    unsigned char *dstpN = dst->data[0] + dst->linesize[0];
     const int dst_pitchY  = dst->linesize[0];
     const int dst_pitchUV = dst->linesize[1];
-    const unsigned char *srcpY = src->data[0] + src_pitchY * slice_start;
-    const unsigned char *srcpU = src->data[1] + src_pitchUV * (slice_start >> 1);
-    const unsigned char *srcpV = src->data[2] + src_pitchUV * (slice_start >> 1);
-    const unsigned char *srcpN = src->data[0] + src_pitchY * (slice_start + 1);
-    unsigned char *dstpU = dst->data[1] + dst_pitchUV * (slice_start >> 1);
-    unsigned char *dstpV = dst->data[2] + dst_pitchUV * (slice_start >> 1);
-    unsigned char *dstpY = dst->data[0] + dst_pitchY * slice_start;
-    unsigned char *dstpN = dst->data[0] + dst_pitchY * (slice_start + 1);
-    const int c2 = td->c2;
-    const int c3 = td->c3;
-    const int c4 = td->c4;
-    const int c5 = td->c5;
-    const int c6 = td->c6;
-    const int c7 = td->c7;
+    const int c2 = color->yuv_convert[color->mode][0][1];
+    const int c3 = color->yuv_convert[color->mode][0][2];
+    const int c4 = color->yuv_convert[color->mode][1][1];
+    const int c5 = color->yuv_convert[color->mode][1][2];
+    const int c6 = color->yuv_convert[color->mode][2][1];
+    const int c7 = color->yuv_convert[color->mode][2][2];
     int x, y;
 
-    for (y = slice_start; y < slice_end; y += 2) {
+    for (y = 0; y < height; y += 2) {
         for (x = 0; x < width; x += 2) {
             const int u = srcpU[x >> 1] - 128;
             const int v = srcpV[x >> 1] - 128;
@@ -326,8 +299,6 @@ static int process_slice_yuv420p(AVFilterContext *ctx, void *arg, int jobnr, int
         dstpU += dst_pitchUV;
         dstpV += dst_pitchUV;
     }
-
-    return 0;
 }
 
 static int config_input(AVFilterLink *inlink)
@@ -353,10 +324,10 @@ static int query_formats(AVFilterContext *ctx)
         AV_PIX_FMT_UYVY422,
         AV_PIX_FMT_NONE
     };
-    AVFilterFormats *fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+
+    return 0;
 }
 
 static int filter_frame(AVFilterLink *link, AVFrame *in)
@@ -365,7 +336,6 @@ static int filter_frame(AVFilterLink *link, AVFrame *in)
     ColorMatrixContext *color = ctx->priv;
     AVFilterLink *outlink = ctx->outputs[0];
     AVFrame *out;
-    ThreadData td = {0};
 
     out = ff_get_video_buffer(outlink, outlink->w, outlink->h);
     if (!out) {
@@ -402,24 +372,12 @@ static int filter_frame(AVFilterLink *link, AVFrame *in)
 
     calc_coefficients(ctx);
 
-    td.src = in;
-    td.dst = out;
-    td.c2 = color->yuv_convert[color->mode][0][1];
-    td.c3 = color->yuv_convert[color->mode][0][2];
-    td.c4 = color->yuv_convert[color->mode][1][1];
-    td.c5 = color->yuv_convert[color->mode][1][2];
-    td.c6 = color->yuv_convert[color->mode][2][1];
-    td.c7 = color->yuv_convert[color->mode][2][2];
-
     if (in->format == AV_PIX_FMT_YUV422P)
-        ctx->internal->execute(ctx, process_slice_yuv422p, &td, NULL,
-                               FFMIN(in->height, ctx->graph->nb_threads));
+        process_frame_yuv422p(color, out, in);
     else if (in->format == AV_PIX_FMT_YUV420P)
-        ctx->internal->execute(ctx, process_slice_yuv420p, &td, NULL,
-                               FFMIN(in->height / 2, ctx->graph->nb_threads));
+        process_frame_yuv420p(color, out, in);
     else
-        ctx->internal->execute(ctx, process_slice_uyvy422, &td, NULL,
-                               FFMIN(in->height, ctx->graph->nb_threads));
+        process_frame_uyvy422(color, out, in);
 
     av_frame_free(&in);
     return ff_filter_frame(outlink, out);
@@ -452,5 +410,5 @@ AVFilter ff_vf_colormatrix = {
     .inputs        = colormatrix_inputs,
     .outputs       = colormatrix_outputs,
     .priv_class    = &colormatrix_class,
-    .flags         = AVFILTER_FLAG_SUPPORT_TIMELINE_GENERIC | AVFILTER_FLAG_SLICE_THREADS,
+    .flags         = AVFILTER_FLAG_SUPPORT_TIMELINE_GENERIC,
 };

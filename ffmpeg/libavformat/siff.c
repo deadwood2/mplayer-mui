@@ -54,11 +54,11 @@ typedef struct SIFFContext {
     int has_audio;
 
     int curstrm;
-    unsigned int pktsize;
+    int pktsize;
     int gmcsize;
-    unsigned int sndsize;
+    int sndsize;
 
-    unsigned int flags;
+    int flags;
     uint8_t gmc[4];
 } SIFFContext;
 
@@ -192,9 +192,9 @@ static int siff_read_header(AVFormatContext *s)
 static int siff_read_packet(AVFormatContext *s, AVPacket *pkt)
 {
     SIFFContext *c = s->priv_data;
+    int size;
 
     if (c->has_video) {
-        unsigned int size;
         if (c->cur_frame >= c->frames)
             return AVERROR_EOF;
         if (c->curstrm == -1) {
@@ -208,11 +208,10 @@ static int siff_read_packet(AVFormatContext *s, AVPacket *pkt)
         }
 
         if (!c->curstrm) {
-            if (c->pktsize < 2LL + c->sndsize + c->gmcsize)
-                return AVERROR_INVALIDDATA;
-
             size = c->pktsize - c->sndsize - c->gmcsize - 2;
             size = ffio_limit(s->pb, size);
+            if (size < 0 || c->pktsize < c->sndsize)
+                return AVERROR_INVALIDDATA;
             if (av_new_packet(pkt, size + c->gmcsize + 2) < 0)
                 return AVERROR(ENOMEM);
             AV_WL16(pkt->data, c->flags);
@@ -225,11 +224,10 @@ static int siff_read_packet(AVFormatContext *s, AVPacket *pkt)
             pkt->stream_index = 0;
             c->curstrm        = -1;
         } else {
-            int pktsize = av_get_packet(s->pb, pkt, c->sndsize - 4);
-            if (pktsize < 0)
+            if ((size = av_get_packet(s->pb, pkt, c->sndsize - 4)) < 0)
                 return AVERROR(EIO);
             pkt->stream_index = 1;
-            pkt->duration     = pktsize;
+            pkt->duration     = size;
             c->curstrm        = 0;
         }
         if (!c->cur_frame || c->curstrm)
@@ -237,12 +235,12 @@ static int siff_read_packet(AVFormatContext *s, AVPacket *pkt)
         if (c->curstrm == -1)
             c->cur_frame++;
     } else {
-        int pktsize = av_get_packet(s->pb, pkt, c->block_align);
-        if (!pktsize)
+        size = av_get_packet(s->pb, pkt, c->block_align);
+        if (!size)
             return AVERROR_EOF;
-        if (pktsize <= 0)
+        if (size < 0)
             return AVERROR(EIO);
-        pkt->duration = pktsize;
+        pkt->duration = size;
     }
     return pkt->size;
 }

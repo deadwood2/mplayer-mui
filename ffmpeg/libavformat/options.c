@@ -117,7 +117,6 @@ AVFormatContext *avformat_alloc_context(void)
         return NULL;
     }
     ic->internal->offset = AV_NOPTS_VALUE;
-    ic->internal->raw_packet_buffer_remaining_size = RAW_PACKET_BUFFER_SIZE;
 
     return ic;
 }

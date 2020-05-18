@@ -144,7 +144,6 @@ int ff_network_init(void)
     if (WSAStartup(MAKEWORD(1,1), &wsaData))
         return 0;
 #endif
-
     return 1;
 }
 

@@ -440,11 +440,12 @@ static int encode_slice_plane(ProresContext *ctx, PutBitContext *pb,
 
 static void put_alpha_diff(PutBitContext *pb, int cur, int prev, int abits)
 {
+    const int mask  = (1 << abits) - 1;
     const int dbits = (abits == 8) ? 4 : 7;
     const int dsize = 1 << dbits - 1;
     int diff = cur - prev;
 
-    diff = av_mod_uintp2(diff, abits);
+    diff &= mask;
     if (diff >= (1 << abits) - dsize)
         diff -= 1 << abits;
     if (diff < -dsize || diff > dsize || !diff) {
@@ -688,11 +689,12 @@ static int estimate_slice_plane(ProresContext *ctx, int *error, int plane,
 
 static int est_alpha_diff(int cur, int prev, int abits)
 {
+    const int mask  = (1 << abits) - 1;
     const int dbits = (abits == 8) ? 4 : 7;
     const int dsize = 1 << dbits - 1;
     int diff = cur - prev;
 
-    diff = av_mod_uintp2(diff, abits);
+    diff &= mask;
     if (diff >= (1 << abits) - dsize)
         diff -= 1 << abits;
     if (diff < -dsize || diff > dsize || !diff)
@@ -1163,7 +1165,6 @@ static av_cold int encode_init(AVCodecContext *avctx)
             av_log(avctx, AV_LOG_ERROR, "alpha bits should be 0, 8 or 16\n");
             return AVERROR(EINVAL);
         }
-        avctx->bits_per_coded_sample = 32;
     } else {
         ctx->alpha_bits = 0;
     }

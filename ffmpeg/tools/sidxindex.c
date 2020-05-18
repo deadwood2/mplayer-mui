@@ -156,8 +156,8 @@ static int handle_file(struct Tracks *tracks, const char *file)
             err = AVERROR(ENOMEM);
             goto fail;
         }
-        temp = av_realloc_array(tracks->tracks, tracks->nb_tracks + 1,
-                                sizeof(*tracks->tracks));
+        temp = av_realloc(tracks->tracks,
+                          sizeof(*tracks->tracks) * (tracks->nb_tracks + 1));
         if (!temp) {
             av_free(track);
             err = AVERROR(ENOMEM);
@@ -244,7 +244,7 @@ static int output_mpd(struct Tracks *tracks, const char *filename)
         nb_tracks = nb_tracks_buf;
         nb_sets = 2;
         for (i = 0; i < 2; i++) {
-            adaptation_sets[i] = av_malloc_array(tracks->nb_tracks, sizeof(*adaptation_sets[i]));
+            adaptation_sets[i] = av_malloc(sizeof(*adaptation_sets[i]) * tracks->nb_tracks);
             if (!adaptation_sets[i]) {
                 ret = AVERROR(ENOMEM);
                 goto err;

@@ -224,6 +224,7 @@ static void decode_lpc(int32_t *coeffs, int mode, int length)
             int a3  = coeffs[2];
             int a4  = a3 + a1;
             int a5  = a4 + a2;
+            coeffs[2] = a5;
             coeffs += 3;
             for (i = 0; i < length - 3; i++) {
                 a3     += *coeffs;
@@ -632,7 +633,7 @@ static int decorrelate(TAKDecContext *s, int c1, int c2, int length)
         for (; length2 > 0; length2 -= tmp) {
             tmp = FFMIN(length2, x);
 
-            for (i = 0; i < tmp; i++)
+            for (i = 0; i < tmp - (tmp == length2); i++)
                 s->residues[filter_order + i] = *p2++ >> dshift;
 
             for (i = 0; i < tmp; i++) {
@@ -656,7 +657,7 @@ static int decorrelate(TAKDecContext *s, int c1, int c2, int length)
                 *p1++ = v;
             }
 
-            memcpy(s->residues, &s->residues[tmp], 2 * filter_order);
+            memmove(s->residues, &s->residues[tmp], 2 * filter_order);
         }
 
         emms_c();
@@ -801,6 +802,12 @@ static int tak_decode_frame(AVCodecContext *avctx, void *data,
                     if (s->mcdparams[i].present) {
                         s->mcdparams[i].index = get_bits(gb, 2);
                         s->mcdparams[i].chan2 = get_bits(gb, 4);
+                        if (s->mcdparams[i].chan2 >= avctx->channels) {
+                            av_log(avctx, AV_LOG_ERROR,
+                                   "invalid channel 2 (%d) for %d channel(s)\n",
+                                   s->mcdparams[i].chan2, avctx->channels);
+                            return AVERROR_INVALIDDATA;
+                        }
                         if (s->mcdparams[i].index == 1) {
                             if ((nbit == s->mcdparams[i].chan2) ||
                                 (ch_mask & 1 << s->mcdparams[i].chan2))

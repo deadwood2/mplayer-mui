@@ -48,9 +48,6 @@ static enum AVPixelFormat h263_get_format(AVCodecContext *avctx)
     if (avctx->codec->id == AV_CODEC_ID_MSS2)
         return AV_PIX_FMT_YUV420P;
 
-    if (CONFIG_GRAY && (avctx->flags & CODEC_FLAG_GRAY))
-        return AV_PIX_FMT_GRAY8;
-
     return avctx->pix_fmt = ff_get_format(avctx, avctx->codec->pix_fmts);
 }
 
@@ -244,10 +241,10 @@ static int decode_slice(MpegEncContext *s)
 
             s->mv_dir  = MV_DIR_FORWARD;
             s->mv_type = MV_TYPE_16X16;
-            ff_dlog(s, "%d %d %06X\n",
+            av_dlog(s, "%d %d %06X\n",
                     ret, get_bits_count(&s->gb), show_bits(&s->gb, 24));
 
-            ff_tlog(NULL, "Decoding MB at %dx%d\n", s->mb_x, s->mb_y);
+            tprintf(NULL, "Decoding MB at %dx%d\n", s->mb_x, s->mb_y);
             ret = s->decode_mb(s, s->block);
 
             if (s->pict_type != AV_PICTURE_TYPE_B)
@@ -462,7 +459,7 @@ retry:
         }
     }
 
-    if (s->bitstream_buffer_size && (s->divx_packed || buf_size <= MAX_NVOP_SIZE)) // divx 5.01+/xvid frame reorder
+    if (s->bitstream_buffer_size && (s->divx_packed || buf_size < 20)) // divx 5.01+/xvid frame reorder
         ret = init_get_bits8(&s->gb, s->bitstream_buffer,
                              s->bitstream_buffer_size);
     else
@@ -563,7 +560,7 @@ retry:
     if (s->codec_id == AV_CODEC_ID_H263  ||
         s->codec_id == AV_CODEC_ID_H263P ||
         s->codec_id == AV_CODEC_ID_H263I)
-        s->gob_index = H263_GOB_HEIGHT(s->height);
+        s->gob_index = ff_h263_get_gob_height(s);
 
     // for skipping the frame
     s->current_picture.f->pict_type = s->pict_type;

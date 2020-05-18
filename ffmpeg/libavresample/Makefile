@@ -3,7 +3,7 @@ NAME = avresample
 HEADERS = avresample.h                                                  \
           version.h                                                     \
 
-OBJS+ = audio_convert.o                                                  \
+OBJS += audio_convert.o                                                  \
        audio_data.o                                                     \
        audio_mix.o                                                      \
        audio_mix_matrix.o                                               \

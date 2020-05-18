@@ -131,12 +131,12 @@
     vmrglw  \d1,\s0,\s1
 .endm
 
-.macro def_fft4 interleave, suffix
-fft4\suffix\()_altivec:
+.macro def_fft4 interleave
+fft4\interleave\()_altivec:
     lvx    v0, 0,r3
     lvx    v1,r9,r3
     FFT4   v0,v1,v2,v3
-.if \interleave
+.ifnb \interleave
     zip    v0,v1,v2,v3
     stvx   v0, 0,r3
     stvx   v1,r9,r3
@@ -147,15 +147,15 @@ fft4\suffix\()_altivec:
     blr
 .endm
 
-.macro def_fft8 interleave, suffix
-fft8\suffix\()_altivec:
+.macro def_fft8 interleave
+fft8\interleave\()_altivec:
     addi   r4,r3,32
     lvx    v0, 0,r3
     lvx    v1,r9,r3
     lvx    v2, 0,r4
     lvx    v3,r9,r4
     FFT8   v0,v1,v2,v3,v4,v5,v6,v7,v8
-.if \interleave
+.ifnb \interleave
     zip    v4,v5,v0,v1
     zip    v6,v7,v2,v3
     stvx   v4, 0,r3
@@ -171,8 +171,8 @@ fft8\suffix\()_altivec:
     blr
 .endm
 
-.macro def_fft16 interleave, suffix
-fft16\suffix\()_altivec:
+.macro def_fft16 interleave
+fft16\interleave\()_altivec:
     addi   r5,r3,64
     addi   r6,r3,96
     addi   r4,r3,32
@@ -200,7 +200,7 @@ fft16\suffix\()_altivec:
     BF     v3,v7,v3,v12
     BF     v1,v5,v1,v11
     BF     v2,v6,v2,v13
-.if \interleave
+.ifnb \interleave
     zip     v8, v9,v0,v1
     zip    v10,v11,v2,v3
     zip    v12,v13,v4,v5
@@ -335,71 +335,6 @@ fft_data:
     vcprm(0,2,s1,s3)
     vcprm(1,3,s0,s2)
 
-.macro lvm8  b, reg01, reg02, reg03, reg04, reg05, reg06, reg07, reg08
-    lvx     \reg01, 0, \b
-    addi    \b, \b, 16
-    lvx     \reg02, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg03, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg04, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg05, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg06, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg07, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg08, 0, \b
-    addi    \b, \b, 16
-.endm
-
-.macro lvm10  b, reg01, reg02, reg03, reg04, reg05, reg06, reg07, reg08, reg09, reg10
-    lvx     \reg01, 0, \b
-    addi    \b, \b, 16
-    lvx     \reg02, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg03, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg04, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg05, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg06, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg07, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg08, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg09, 0, \b
-    addi    \b, \b, 16
-	lvx     \reg10, 0, \b
-    addi    \b, \b, 16
-.endm
-
-.macro stvm10 b, reg01, reg02, reg03, reg04, reg05, reg06, reg07, reg08, reg09, reg10
-	stvx    \reg01, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg02, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg03, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg04, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg05, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg06, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg07, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg08, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg09, 0, \b
-    addi    \b, \b, 16
-	stvx    \reg10, 0, \b
-    addi    \b, \b, 16
-.endm
-
 .macro lvm  b, r, regs:vararg
     lvx     \r, 0, \b
     addi    \b, \b, 16
@@ -423,15 +358,15 @@ extfunc ff_fft_calc\interleave\()_altivec
     stpu    r1, -(160+16*PS)(r1)
     get_got r11
     addi    r6, r1, 16*PS
-	stvm10  r6, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29
+    stvm    r6, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29
     mfvrsave r0
     stw     r0, 15*PS(r1)
     li      r6, 0xfffffffc
     mtvrsave r6
 
     movrel  r6, fft_data, r11
-	lvm8    r6, v14, v15, v16, v17, v18, v19, v20, v21
-	lvm8    r6, v22, v23, v24, v25, v26, v27, v28, v29
+    lvm     r6, v14, v15, v16, v17, v18, v19, v20, v21
+    lvm     r6, v22, v23, v24, v25, v26, v27, v28, v29
 
     li      r9, 16
     movrel  r12, X(ff_cos_tabs), r11
@@ -446,7 +381,7 @@ extfunc ff_fft_calc\interleave\()_altivec
     bctrl
 
     addi    r6, r1, 16*PS
-	lvm10   r6, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29
+    lvm     r6, v20, v21, v22, v23, v24, v25, v26, v27, v28, v29
     lwz     r6, 15*PS(r1)
     mtvrsave r6
     lp      r1, 0(r1)
@@ -474,9 +409,9 @@ fft\n\suffix\()_altivec:
 
 .macro DECL_FFTS interleave, suffix
     .text
-	def_fft4  \interleave, \suffix
-	def_fft8  \interleave, \suffix
-	def_fft16 \interleave, \suffix
+    def_fft4  \suffix
+    def_fft8  \suffix
+    def_fft16 \suffix
     PASS \interleave, \suffix
     DECL_FFT \suffix, 5,   32,   16,    8
     DECL_FFT \suffix, 6,   64,   32,   16

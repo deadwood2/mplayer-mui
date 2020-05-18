@@ -159,8 +159,8 @@ int av_buffer_make_writable(AVBufferRef **pbuf)
         return AVERROR(ENOMEM);
 
     memcpy(newbuf->data, buf->data, buf->size);
-
-    buffer_replace(pbuf, &newbuf);
+    av_buffer_unref(pbuf);
+    *pbuf = newbuf;
 
     return 0;
 }
@@ -201,7 +201,8 @@ int av_buffer_realloc(AVBufferRef **pbuf, int size)
 
         memcpy(new->data, buf->data, FFMIN(size, buf->size));
 
-        buffer_replace(pbuf, &new);
+        av_buffer_unref(pbuf);
+        *pbuf = new;
         return 0;
     }
 

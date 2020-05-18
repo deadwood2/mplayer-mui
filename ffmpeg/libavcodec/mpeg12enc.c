@@ -52,7 +52,7 @@ static const uint8_t svcd_scan_offset_placeholder[] = {
     0x81, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
 
-static uint8_t mv_penalty[MAX_FCODE + 1][MAX_MV * 2 + 1];
+static uint8_t mv_penalty[MAX_FCODE + 1][MAX_DMV * 2 + 1];
 static uint8_t fcode_tab[MAX_MV * 2 + 1];
 
 static uint8_t uni_mpeg1_ac_vlc_len[64 * 64 * 2];
@@ -143,9 +143,6 @@ static int find_frame_rate_index(MpegEncContext *s)
 static av_cold int encode_init(AVCodecContext *avctx)
 {
     MpegEncContext *s = avctx->priv_data;
-
-    if (avctx->codec_id == AV_CODEC_ID_MPEG1VIDEO && avctx->height > 2800)
-        avctx->thread_count = 1;
 
     if (ff_mpv_encode_init(avctx) < 0)
         return -1;
@@ -620,12 +617,12 @@ static inline void encode_dc(MpegEncContext *s, int diff, int component)
             put_bits(&s->pb,
                      ff_mpeg12_vlc_dc_lum_bits[index] + index,
                      (ff_mpeg12_vlc_dc_lum_code[index] << index) +
-                     av_mod_uintp2(diff, index));
+                     (diff & ((1 << index) - 1)));
         else
             put_bits(&s->pb,
                      ff_mpeg12_vlc_dc_chroma_bits[index] + index,
                      (ff_mpeg12_vlc_dc_chroma_code[index] << index) +
-                     av_mod_uintp2(diff, index));
+                     (diff & ((1 << index) - 1)));
     } else {
         if (component == 0)
             put_bits(&s->pb,
@@ -1041,17 +1038,17 @@ av_cold void ff_mpeg1_encode_init(MpegEncContext *s)
 
             bits = ff_mpeg12_vlc_dc_lum_bits[index] + index;
             code = (ff_mpeg12_vlc_dc_lum_code[index] << index) +
-                    av_mod_uintp2(diff, index);
+                   (diff & ((1 << index) - 1));
             mpeg1_lum_dc_uni[i + 255] = bits + (code << 8);
 
             bits = ff_mpeg12_vlc_dc_chroma_bits[index] + index;
             code = (ff_mpeg12_vlc_dc_chroma_code[index] << index) +
-                    av_mod_uintp2(diff, index);
+                   (diff & ((1 << index) - 1));
             mpeg1_chr_dc_uni[i + 255] = bits + (code << 8);
         }
 
         for (f_code = 1; f_code <= MAX_FCODE; f_code++)
-            for (mv = -MAX_MV; mv <= MAX_MV; mv++) {
+            for (mv = -MAX_DMV; mv <= MAX_DMV; mv++) {
                 int len;
 
                 if (mv == 0) {
@@ -1074,7 +1071,7 @@ av_cold void ff_mpeg1_encode_init(MpegEncContext *s)
                               2 + bit_size;
                 }
 
-                mv_penalty[f_code][mv + MAX_MV] = len;
+                mv_penalty[f_code][mv + MAX_DMV] = len;
             }
 
 

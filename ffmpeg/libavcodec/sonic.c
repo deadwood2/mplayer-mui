@@ -497,11 +497,14 @@ static int predictor_calc_error(int *k, int *state, int order, int error)
 // copes better with quantization, and calculates the
 // actual whitened result as it goes.
 
-static void modified_levinson_durbin(int *window, int window_entries,
+static int modified_levinson_durbin(int *window, int window_entries,
         int *out, int out_entries, int channels, int *tap_quant)
 {
     int i;
     int *state = av_calloc(window_entries, sizeof(*state));
+
+    if (!state)
+        return AVERROR(ENOMEM);
 
     memcpy(state, window, 4* window_entries);
 
@@ -567,6 +570,7 @@ static void modified_levinson_durbin(int *window, int window_entries,
     }
 
     av_free(state);
+    return 0;
 }
 
 static inline int code_samplerate(int samplerate)
@@ -627,6 +631,9 @@ static av_cold int sonic_encode_init(AVCodecContext *avctx)
 
     // generate taps
     s->tap_quant = av_calloc(s->num_taps, sizeof(*s->tap_quant));
+    if (!s->tap_quant)
+        return AVERROR(ENOMEM);
+
     for (i = 0; i < s->num_taps; i++)
         s->tap_quant[i] = ff_sqrt(i+1);
 
@@ -656,7 +663,7 @@ static av_cold int sonic_encode_init(AVCodecContext *avctx)
 
     s->window_size = ((2*s->tail_size)+s->frame_size);
     s->window = av_calloc(s->window_size, sizeof(*s->window));
-    if (!s->window)
+    if (!s->window || !s->int_samples)
         return AVERROR(ENOMEM);
 
     avctx->extradata = av_mallocz(16);
@@ -769,8 +776,11 @@ static int sonic_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
         s->tail[i] = s->int_samples[s->frame_size - s->tail_size + i];
 
     // generate taps
-    modified_levinson_durbin(s->window, s->window_size,
+    ret = modified_levinson_durbin(s->window, s->window_size,
                 s->predictor_k, s->num_taps, s->channels, s->tap_quant);
+    if (ret < 0)
+        return ret;
+
     if ((ret = intlist_write(&c, state, s->predictor_k, s->num_taps, 0)) < 0)
         return ret;
 
@@ -873,17 +883,24 @@ static av_cold int sonic_decode_init(AVCodecContext *avctx)
 
     if (s->version >= 1)
     {
+        int sample_rate_index;
         s->channels = get_bits(&gb, 2);
-        s->samplerate = samplerate_table[get_bits(&gb, 4)];
+        sample_rate_index = get_bits(&gb, 4);
+        if (sample_rate_index >= FF_ARRAY_ELEMS(samplerate_table)) {
+            av_log(avctx, AV_LOG_ERROR, "Invalid sample_rate_index %d\n", sample_rate_index);
+            return AVERROR_INVALIDDATA;
+        }
+        s->samplerate = samplerate_table[sample_rate_index];
         av_log(avctx, AV_LOG_INFO, "Sonicv2 chans: %d samprate: %d\n",
             s->channels, s->samplerate);
     }
 
-    if (s->channels > MAX_CHANNELS)
+    if (s->channels > MAX_CHANNELS || s->channels < 1)
     {
         av_log(avctx, AV_LOG_ERROR, "Only mono and stereo streams are supported by now\n");
         return AVERROR_INVALIDDATA;
     }
+    avctx->channels = s->channels;
 
     s->lossless = get_bits1(&gb);
     if (!s->lossless)
@@ -908,11 +925,21 @@ static av_cold int sonic_decode_init(AVCodecContext *avctx)
     s->frame_size = s->channels*s->block_align*s->downsampling;
 //    avctx->frame_size = s->block_align;
 
+    if (s->num_taps * s->channels > s->frame_size) {
+        av_log(avctx, AV_LOG_ERROR,
+               "number of taps times channels (%d * %d) larger than frame size %d\n",
+               s->num_taps, s->channels, s->frame_size);
+        return AVERROR_INVALIDDATA;
+    }
+
     av_log(avctx, AV_LOG_INFO, "Sonic: ver: %d.%d ls: %d dr: %d taps: %d block: %d frame: %d downsamp: %d\n",
         s->version, s->minor_version, s->lossless, s->decorrelation, s->num_taps, s->block_align, s->frame_size, s->downsampling);
 
     // generate taps
     s->tap_quant = av_calloc(s->num_taps, sizeof(*s->tap_quant));
+    if (!s->tap_quant)
+        return AVERROR(ENOMEM);
+
     for (i = 0; i < s->num_taps; i++)
         s->tap_quant[i] = ff_sqrt(i+1);
 
@@ -932,6 +959,8 @@ static av_cold int sonic_decode_init(AVCodecContext *avctx)
             return AVERROR(ENOMEM);
     }
     s->int_samples = av_calloc(s->frame_size, sizeof(*s->int_samples));
+    if (!s->int_samples)
+        return AVERROR(ENOMEM);
 
     avctx->sample_fmt = AV_SAMPLE_FMT_S16;
     return 0;

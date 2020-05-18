@@ -106,25 +106,22 @@ static int query_formats(AVFilterContext *ctx)
         AV_SAMPLE_FMT_DBL,
         AV_SAMPLE_FMT_NONE,
     };
-    int ret;
 
     if (ff_add_channel_layout(&layouts, AV_CH_LAYOUT_STEREO) != 0)
         return AVERROR(ENOMEM);
-    ret = ff_set_common_channel_layouts(ctx, layouts);
-    if (ret < 0)
-        return ret;
+    ff_set_common_channel_layouts(ctx, layouts);
 
     formats = ff_make_format_list(sample_fmts);
     if (!formats)
         return AVERROR(ENOMEM);
-    ret = ff_set_common_formats(ctx, formats);
-    if (ret < 0)
-        return ret;
+    ff_set_common_formats(ctx, formats);
 
     formats = ff_all_samplerates();
     if (!formats)
         return AVERROR(ENOMEM);
-    return ff_set_common_samplerates(ctx, formats);
+    ff_set_common_samplerates(ctx, formats);
+
+    return 0;
 }
 
 static int filter_frame(AVFilterLink *inlink, AVFrame *frame)

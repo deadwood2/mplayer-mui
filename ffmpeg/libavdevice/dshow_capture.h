@@ -33,8 +33,6 @@
 #include <dshow.h>
 #include <dvdmedia.h>
 
-#include "libavcodec/internal.h"
-
 /* EC_DEVICE_LOST is not defined in MinGW dshow headers. */
 #ifndef EC_DEVICE_LOST
 #define EC_DEVICE_LOST 0x1f
@@ -46,8 +44,12 @@ void ff_print_AUDIO_STREAM_CONFIG_CAPS(const AUDIO_STREAM_CONFIG_CAPS *caps);
 void ff_print_AM_MEDIA_TYPE(const AM_MEDIA_TYPE *type);
 void ff_printGUID(const GUID *g);
 
+#if DSHOWDEBUG
 extern const AVClass *ff_dshow_context_class_ptr;
-#define dshowdebug(...) ff_dlog(&ff_dshow_context_class_ptr, __VA_ARGS__)
+#define dshowdebug(...) av_log(&ff_dshow_context_class_ptr, AV_LOG_DEBUG, __VA_ARGS__)
+#else
+#define dshowdebug(...)
+#endif
 
 static inline void nothing(void *foo)
 {
@@ -305,10 +307,6 @@ struct dshow_ctx {
     int   show_audio_crossbar_connection_dialog;
     int   show_analog_tv_tuner_dialog;
     int   show_analog_tv_tuner_audio_dialog;
-    char *audio_filter_load_file;
-    char *audio_filter_save_file;
-    char *video_filter_load_file;
-    char *video_filter_save_file;
 
     IBaseFilter *device_filter[2];
     IPin        *device_pin[2];

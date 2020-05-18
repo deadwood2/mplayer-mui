@@ -102,7 +102,8 @@ static int query_formats(AVFilterContext *ctx)
             ff_add_format(&formats, fmt);
     }
 
-    return ff_set_common_formats(ctx, formats);
+    ff_set_common_formats(ctx, formats);
+    return 0;
 }
 
 static av_cold void uninit(AVFilterContext *ctx)
@@ -271,7 +272,7 @@ static int filter_frame(AVFilterLink *link, AVFrame *frame)
     s->x &= ~((1 << s->hsub) - 1);
     s->y &= ~((1 << s->vsub) - 1);
 
-    av_log(ctx, AV_LOG_TRACE, "n:%d t:%f pos:%f x:%d y:%d x+w:%d y+h:%d\n",
+    av_dlog(ctx, "n:%d t:%f pos:%f x:%d y:%d x+w:%d y+h:%d\n",
             (int)s->var_values[VAR_N], s->var_values[VAR_T], s->var_values[VAR_POS],
             s->x, s->y, s->x+s->w, s->y+s->h);
 

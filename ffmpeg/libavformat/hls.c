@@ -165,7 +165,6 @@ struct variant {
 };
 
 typedef struct HLSContext {
-    AVClass *class;
     int n_variants;
     struct variant **variants;
     int n_playlists;
@@ -174,7 +173,6 @@ typedef struct HLSContext {
     struct rendition **renditions;
 
     int cur_seq_no;
-    int live_start_index;
     int first_packet;
     int64_t first_timestamp;
     int64_t cur_timestamp;
@@ -913,6 +911,23 @@ static void update_options(char **dest, const char *name, void *src)
         av_freep(dest);
 }
 
+static int check_url(const char *url) {
+    const char *proto_name = avio_find_protocol_name(url);
+
+    if (!proto_name)
+        return AVERROR_INVALIDDATA;
+
+    if (!av_strstart(proto_name, "http", NULL) && !av_strstart(proto_name, "file", NULL))
+        return AVERROR_INVALIDDATA;
+
+    if (!strncmp(proto_name, url, strlen(proto_name)) && url[strlen(proto_name)] == ':')
+        return 0;
+    else if (strcmp(proto_name, "file") || !strncmp(url, "file,", 5))
+        return AVERROR_INVALIDDATA;
+
+    return 0;
+}
+
 static int open_input(HLSContext *c, struct playlist *pls)
 {
     AVDictionary *opts = NULL;
@@ -940,6 +955,10 @@ static int open_input(HLSContext *c, struct playlist *pls)
            seg->url, seg->url_offset, pls->index);
 
     if (seg->key_type == KEY_NONE) {
+        ret = check_url(seg->url);
+        if (ret < 0)
+            goto cleanup;
+
         ret = ffurl_open(&pls->input, seg->url, AVIO_FLAG_READ,
                           &pls->parent->interrupt_callback, &opts);
 
@@ -947,6 +966,10 @@ static int open_input(HLSContext *c, struct playlist *pls)
         char iv[33], key[33], url[MAX_URL_SIZE];
         if (strcmp(seg->key, pls->key_url)) {
             URLContext *uc;
+            ret = check_url(seg->key);
+            if (ret < 0)
+                goto cleanup;
+
             if (ffurl_open(&uc, seg->key, AVIO_FLAG_READ,
                            &pls->parent->interrupt_callback, &opts2) == 0) {
                 if (ffurl_read_complete(uc, pls->key, sizeof(pls->key))
@@ -1087,8 +1110,7 @@ reload:
         if (ret < 0) {
             av_log(v->parent, AV_LOG_WARNING, "Failed to open segment of playlist %d\n",
                    v->index);
-            v->cur_seq_no += 1;
-            goto reload;
+            return ret;
         }
         just_opened = 1;
     }
@@ -1240,12 +1262,10 @@ static int select_cur_seq_no(HLSContext *c, struct playlist *pls)
              * require us to download a segment to inspect its timestamps. */
             return c->cur_seq_no;
 
-        /* If this is a live stream, start live_start_index segments from the
-         * start or end */
-        if (c->live_start_index < 0)
-            return pls->start_seq_no + FFMAX(pls->n_segments + c->live_start_index, 0);
-        else
-            return pls->start_seq_no + FFMIN(c->live_start_index, pls->n_segments - 1);
+        /* If this is a live stream with more than 3 segments, start at the
+         * third last segment. */
+        if (pls->n_segments > 3)
+            return pls->start_seq_no + pls->n_segments - 3;
     }
 
     /* Otherwise just start on the first segment. */
@@ -1340,12 +1360,6 @@ static int hls_read_header(AVFormatContext *s)
         pls->cur_seq_no = select_cur_seq_no(c, pls);
 
         pls->read_buffer = av_malloc(INITIAL_BUFFER_SIZE);
-        if (!pls->read_buffer){
-            ret = AVERROR(ENOMEM);
-            avformat_free_context(pls->ctx);
-            pls->ctx = NULL;
-            goto fail;
-        }
         ffio_init_context(&pls->pb, pls->read_buffer, INITIAL_BUFFER_SIZE, 0, pls,
                           read_data, NULL, NULL);
         pls->pb.seekable = 0;
@@ -1725,25 +1739,9 @@ static int hls_probe(AVProbeData *p)
     return 0;
 }
 
-#define OFFSET(x) offsetof(HLSContext, x)
-#define FLAGS AV_OPT_FLAG_DECODING_PARAM
-static const AVOption hls_options[] = {
-    {"live_start_index", "segment index to start live streams at (negative values are from the end)",
-        OFFSET(live_start_index), FF_OPT_TYPE_INT, {.i64 = -3}, INT_MIN, INT_MAX, FLAGS},
-    {NULL}
-};
-
-static const AVClass hls_class = {
-    .class_name = "hls,applehttp",
-    .item_name  = av_default_item_name,
-    .option     = hls_options,
-    .version    = LIBAVUTIL_VERSION_INT,
-};
-
 AVInputFormat ff_hls_demuxer = {
     .name           = "hls,applehttp",
     .long_name      = NULL_IF_CONFIG_SMALL("Apple HTTP Live Streaming"),
-    .priv_class     = &hls_class,
     .priv_data_size = sizeof(HLSContext),
     .read_probe     = hls_probe,
     .read_header    = hls_read_header,

@@ -23,13 +23,9 @@
 
 #include "config.h"
 
-#ifdef __ALTIVEC__
 #if HAVE_ALTIVEC_H
 #include <altivec.h>
 #endif
-#endif
-
-typedef struct { unsigned int foo[4]; } av_placeholder __attribute__((aligned(16)));
 
 #include "version.h"
 
@@ -43,7 +39,8 @@ typedef struct { unsigned int foo[4]; } av_placeholder __attribute__((aligned(16
 
 #define STR(s) AV_TOSTRING(s) // AV_STRINGIFY is too long
 
-#define YUVRGB_TABLE_HEADROOM 256
+#define YUVRGB_TABLE_HEADROOM 512
+#define YUVRGB_TABLE_LUMA_HEADROOM 512
 
 #define MAX_FILTER_SIZE SWS_MAX_FILTER_SIZE
 
@@ -311,17 +308,9 @@ typedef struct SwsContext {
      * sequential steps, this is for example used to limit the maximum
      * downscaling factor that needs to be supported in one scaler.
      */
-    struct SwsContext *cascaded_context[3];
+    struct SwsContext *cascaded_context[2];
     int cascaded_tmpStride[4];
     uint8_t *cascaded_tmp[4];
-    int cascaded1_tmpStride[4];
-    uint8_t *cascaded1_tmp[4];
-
-    double gamma_value;
-    int gamma_flag;
-    int is_internal_gamma;
-    uint16_t *gamma;
-    uint16_t *inv_gamma;
 
     uint32_t pal_yuv[256];
     uint32_t pal_rgb[256];
@@ -487,7 +476,6 @@ typedef struct SwsContext {
     const uint8_t *chrDither8, *lumDither8;
 
 #if HAVE_ALTIVEC
-#ifdef __ALTIVEC__
     vector signed short   CY;
     vector signed short   CRV;
     vector signed short   CBU;
@@ -496,16 +484,6 @@ typedef struct SwsContext {
     vector signed short   OY;
     vector unsigned short CSHIFT;
     vector signed short  *vYCoeffsBank, *vCCoeffsBank;
-#else
-    av_placeholder CY;
-    av_placeholder CRV;
-    av_placeholder CBU;
-    av_placeholder CGU;
-    av_placeholder CGV;
-    av_placeholder OY;
-    av_placeholder CSHIFT;
-    av_placeholder *vYCoeffsBank, *vCCoeffsBank;
-#endif
 #endif
 
     int use_mmx_vfilter;

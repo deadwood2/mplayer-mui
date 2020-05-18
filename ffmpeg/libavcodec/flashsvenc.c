@@ -111,7 +111,7 @@ static av_cold int flashsv_encode_init(AVCodecContext *avctx)
 
     if (avctx->width > 4095 || avctx->height > 4095) {
         av_log(avctx, AV_LOG_ERROR,
-               "Input dimensions too large, input must be max 4096x4096 !\n");
+               "Input dimensions too large, input must be max 4095x4095 !\n");
         return AVERROR_INVALIDDATA;
     }
 
@@ -197,7 +197,7 @@ static int encode_bitstream(FlashSVContext *s, const AVFrame *p, uint8_t *buf,
 
                 bytestream_put_be16(&ptr, zsize);
                 buf_pos += zsize + 2;
-                ff_dlog(s->avctx, "buf_pos = %d\n", buf_pos);
+                av_dlog(s->avctx, "buf_pos = %d\n", buf_pos);
             } else {
                 pred_blocks++;
                 bytestream_put_be16(&ptr, 0);
@@ -265,7 +265,7 @@ static int flashsv_encode_frame(AVCodecContext *avctx, AVPacket *pkt,
         avctx->coded_frame->pict_type      = AV_PICTURE_TYPE_I;
         avctx->coded_frame->key_frame      = 1;
         s->last_key_frame = avctx->frame_number;
-        ff_dlog(avctx, "Inserting keyframe at frame %d\n", avctx->frame_number);
+        av_dlog(avctx, "Inserting keyframe at frame %d\n", avctx->frame_number);
     } else {
         avctx->coded_frame->pict_type = AV_PICTURE_TYPE_P;
         avctx->coded_frame->key_frame = 0;

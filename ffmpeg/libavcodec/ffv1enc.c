@@ -256,7 +256,7 @@ static inline void put_vlc_symbol(PutBitContext *pb, VlcState *const state,
     code = v ^ ((2 * state->drift + state->count) >> 31);
 #endif
 
-    ff_dlog(NULL, "v:%d/%d bias:%d error:%d drift:%d count:%d k:%d\n", v, code,
+    av_dlog(NULL, "v:%d/%d bias:%d error:%d drift:%d count:%d k:%d\n", v, code,
             state->bias, state->error_sum, state->drift, state->count, k);
     set_sr_golomb(pb, code, k, 12, bits);
 
@@ -342,7 +342,7 @@ static av_always_inline int encode_line(FFV1Context *s, int w,
                 }
             }
 
-            ff_dlog(s->avctx, "count:%d index:%d, mode:%d, x:%d pos:%d\n",
+            av_dlog(s->avctx, "count:%d index:%d, mode:%d, x:%d pos:%d\n",
                     run_count, run_index, run_mode, x,
                     (int)put_bits_count(&s->pb));
 
@@ -753,21 +753,15 @@ static av_cold int encode_init(AVCodecContext *avctx)
         s->chroma_planes = desc->nb_components < 3 ? 0 : 1;
         s->colorspace = 0;
         s->transparency = desc->nb_components == 4;
-        if (!avctx->bits_per_raw_sample)
-            s->bits_per_raw_sample = 8;
         break;
     case AV_PIX_FMT_RGB32:
         s->colorspace = 1;
         s->transparency = 1;
         s->chroma_planes = 1;
-        if (!avctx->bits_per_raw_sample)
-            s->bits_per_raw_sample = 8;
         break;
     case AV_PIX_FMT_0RGB32:
         s->colorspace = 1;
         s->chroma_planes = 1;
-        if (!avctx->bits_per_raw_sample)
-            s->bits_per_raw_sample = 8;
         break;
     case AV_PIX_FMT_GBRP9:
         if (!avctx->bits_per_raw_sample)
@@ -786,10 +780,6 @@ static av_cold int encode_init(AVCodecContext *avctx)
         s->colorspace = 1;
         s->chroma_planes = 1;
         s->version = FFMAX(s->version, 1);
-        if (!s->ac && avctx->coder_type == -1) {
-            av_log(avctx, AV_LOG_INFO, "bits_per_raw_sample > 8, forcing coder 1\n");
-            s->ac = 2;
-        }
         if (!s->ac) {
             av_log(avctx, AV_LOG_ERROR, "bits_per_raw_sample of more than 8 needs -coder 1 currently\n");
             return AVERROR(ENOSYS);
@@ -799,8 +789,6 @@ static av_cold int encode_init(AVCodecContext *avctx)
         av_log(avctx, AV_LOG_ERROR, "format not supported\n");
         return AVERROR(ENOSYS);
     }
-    av_assert0(s->bits_per_raw_sample >= 8);
-
     if (s->transparency) {
         av_log(avctx, AV_LOG_WARNING, "Storing alpha plane, this will require a recent FFV1 decoder to playback!\n");
     }
@@ -974,6 +962,7 @@ slices_ok:
 
     if ((ret = ffv1_init_slice_contexts(s)) < 0)
         return ret;
+    s->slice_count = s->max_slice_count;
     if ((ret = ffv1_init_slices_state(s)) < 0)
         return ret;
 
@@ -983,7 +972,7 @@ slices_ok:
         if (!avctx->stats_out)
             return AVERROR(ENOMEM);
         for (i = 0; i < s->quant_table_count; i++)
-            for (j = 0; j < s->slice_count; j++) {
+            for (j = 0; j < s->max_slice_count; j++) {
                 FFV1Context *sf = s->slice_context[j];
                 av_assert0(!sf->rc_stat2[i]);
                 sf->rc_stat2[i] = av_mallocz(s->context_count[i] *
@@ -1207,6 +1196,7 @@ static int encode_frame(AVCodecContext *avctx, AVPacket *pkt,
             for (i = 0; i < f->quant_table_count; i++)
                 memset(f->rc_stat2[i], 0, f->context_count[i] * sizeof(*f->rc_stat2[i]));
 
+            av_assert0(f->slice_count == f->max_slice_count);
             for (j = 0; j < f->slice_count; j++) {
                 FFV1Context *fs = f->slice_context[j];
                 for (i = 0; i < 256; i++) {

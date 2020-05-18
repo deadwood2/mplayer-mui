@@ -268,11 +268,11 @@ static int X264_frame(AVCodecContext *ctx, AVPacket *pkt, const AVFrame *frame,
     }
     do {
         if (x264_encoder_encode(x4->enc, &nal, &nnal, frame? &x4->pic: NULL, &pic_out) < 0)
-            return AVERROR_EXTERNAL;
+            return -1;
 
         ret = encode_nals(ctx, pkt, nal, nnal);
         if (ret < 0)
-            return ret;
+            return -1;
     } while (!ret && !frame && x264_encoder_delayed_frames(x4->enc));
 
     pkt->pts = pic_out.i_pts;
@@ -307,10 +307,8 @@ static av_cold int X264_close(AVCodecContext *avctx)
     av_freep(&avctx->extradata);
     av_freep(&x4->sei);
 
-    if (x4->enc) {
+    if (x4->enc)
         x264_encoder_close(x4->enc);
-        x4->enc = NULL;
-    }
 
     av_frame_free(&avctx->coded_frame);
 
@@ -689,7 +687,7 @@ static av_cold int X264_init(AVCodecContext *avctx)
 
     x4->enc = x264_encoder_open(&x4->params);
     if (!x4->enc)
-        return AVERROR_EXTERNAL;
+        return -1;
 
     avctx->coded_frame = av_frame_alloc();
     if (!avctx->coded_frame)
@@ -703,7 +701,7 @@ static av_cold int X264_init(AVCodecContext *avctx)
         s = x264_encoder_headers(x4->enc, &nal, &nnal);
         avctx->extradata = p = av_malloc(s);
         if (!p)
-            return AVERROR(ENOMEM);
+            goto nomem;
 
         for (i = 0; i < nnal; i++) {
             /* Don't put the SEI in extradata. */
@@ -712,7 +710,7 @@ static av_cold int X264_init(AVCodecContext *avctx)
                 x4->sei_size = nal[i].i_payload;
                 x4->sei      = av_malloc(x4->sei_size);
                 if (!x4->sei)
-                    return AVERROR(ENOMEM);
+                    goto nomem;
                 memcpy(x4->sei, nal[i].p_payload, nal[i].i_payload);
                 continue;
             }
@@ -723,6 +721,9 @@ static av_cold int X264_init(AVCodecContext *avctx)
     }
 
     return 0;
+nomem:
+    X264_close(avctx);
+    return AVERROR(ENOMEM);
 }
 
 static const enum AVPixelFormat pix_fmts_8bit[] = {
@@ -888,8 +889,6 @@ AVCodec ff_libx264_encoder = {
     .priv_class       = &x264_class,
     .defaults         = x264_defaults,
     .init_static_data = X264_init_static,
-    .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE |
-                        FF_CODEC_CAP_INIT_CLEANUP,
 };
 
 AVCodec ff_libx264rgb_encoder = {

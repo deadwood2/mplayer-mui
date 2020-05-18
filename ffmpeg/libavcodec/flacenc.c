@@ -68,7 +68,6 @@ typedef struct RiceContext {
     enum CodingMode coding_mode;
     int porder;
     int params[MAX_PARTITIONS];
-    uint32_t udata[FLAC_MAX_BLOCKSIZE];
 } RiceContext;
 
 typedef struct FlacSubframe {
@@ -529,9 +528,6 @@ static uint64_t subframe_count_exact(FlacEncodeContext *s, FlacSubframe *sub,
     /* subframe header */
     count += 8;
 
-    if (sub->wasted)
-        count += sub->wasted;
-
     /* subframe */
     if (sub->type == FLAC_SUBFRAME_CONSTANT) {
         count += sub->obits;
@@ -648,6 +644,7 @@ static uint64_t calc_rice_params(RiceContext *rc, int pmin, int pmax,
     uint64_t bits[MAX_PARTITION_ORDER+1];
     int opt_porder;
     RiceContext tmp_rc;
+    uint32_t *udata;
     uint64_t sums[MAX_PARTITIONS];
 
     av_assert1(pmin >= 0 && pmin <= MAX_PARTITION_ORDER);
@@ -656,16 +653,17 @@ static uint64_t calc_rice_params(RiceContext *rc, int pmin, int pmax,
 
     tmp_rc.coding_mode = rc->coding_mode;
 
+    udata = av_malloc_array(n,  sizeof(uint32_t));
     for (i = 0; i < n; i++)
-        rc->udata[i] = (2 * data[i]) ^ (data[i] >> 31);
+        udata[i] = (2*data[i]) ^ (data[i]>>31);
 
-    calc_sum_top(pmax, rc->udata, n, pred_order, sums);
+    calc_sum_top(pmax, udata, n, pred_order, sums);
 
     opt_porder = pmin;
     bits[pmin] = UINT32_MAX;
     for (i = pmax; ; ) {
         bits[i] = calc_optimal_rice_params(&tmp_rc, i, sums, n, pred_order);
-        if (bits[i] < bits[opt_porder]) {
+        if (bits[i] < bits[opt_porder] || pmax == pmin) {
             opt_porder = i;
             *rc = tmp_rc;
         }
@@ -674,6 +672,7 @@ static uint64_t calc_rice_params(RiceContext *rc, int pmin, int pmax,
         calc_sum_next(--i, sums);
     }
 
+    av_freep(&udata);
     return bits[opt_porder];
 }
 
@@ -921,7 +920,7 @@ static int count_frame_header(FlacEncodeContext *s)
         count += 16;
 
     /* explicit sample rate */
-    count += ((s->sr_code[0] == 12) + (s->sr_code[0] > 12)) * 8;
+    count += ((s->sr_code[0] == 12) + (s->sr_code[0] > 12) * 2) * 8;
 
     /* frame header CRC-8 */
     count += 8;

@@ -820,7 +820,7 @@ static void decode_qu_spectra(GetBitContext *gb, const Atrac3pSpecCodeTab *tab,
     int num_coeffs = tab->num_coeffs;
     int bits       = tab->bits;
     int is_signed  = tab->is_signed;
-    unsigned val;
+    unsigned val, mask = (1 << bits) - 1;
 
     for (pos = 0; pos < num_specs;) {
         if (group_size == 1 || get_bits1(gb)) {
@@ -828,7 +828,7 @@ static void decode_qu_spectra(GetBitContext *gb, const Atrac3pSpecCodeTab *tab,
                 val = get_vlc2(gb, vlc_tab->table, vlc_tab->bits, 1);
 
                 for (i = 0; i < num_coeffs; i++) {
-                    cf = av_mod_uintp2(val, bits);
+                    cf = val & mask;
                     if (is_signed)
                         cf = sign_extend(cf, bits);
                     else if (cf && get_bits1(gb))

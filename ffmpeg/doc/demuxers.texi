@@ -98,7 +98,7 @@ All subsequent file-related directives apply to that file.
 
 @item @code{ffconcat version 1.0}
 Identify the script type and version. It also sets the @option{safe} option
-to 1 if it was to its default -1.
+to 1 if it was -1.
 
 To make FFmpeg recognize the format automatically, this directive must
 appears exactly as is (no extra space or byte-order-mark) on the very first
@@ -145,7 +145,9 @@ component.
 
 If set to 0, any file name is accepted.
 
-The default is -1, it is equivalent to 1 if the format was automatically
+The default is 1.
+
+-1 is equivalent to 1 if the format was automatically
 probed and 0 otherwise.
 
 @item auto_convert
@@ -205,11 +207,6 @@ It accepts the following options:
 Set the minimum valid delay between frames in hundredths of seconds.
 Range is 0 to 6000. Default value is 2.
 
-@item max_gif_delay
-Set the maximum valid delay between frames in hundredth of seconds.
-Range is 0 to 65535. Default value is 65535 (nearly eleven minutes),
-the maximum value allowed by the specification.
-
 @item default_delay
 Set the default delay between frames in hundredths of seconds.
 Range is 0 to 6000. Default value is 10.
@@ -258,10 +255,6 @@ Select the pattern type used to interpret the provided filename.
 
 @var{pattern_type} accepts one of the following values.
 @table @option
-@item none
-Disable pattern matching, therefore the video will only contain the specified
-image. You should use this option if you do not want to create sequences from
-multiple images and your filenames may contain special pattern characters.
 @item sequence
 Select a sequence pattern type, used to specify a sequence of files
 indexed by sequential numbers.
@@ -367,6 +360,23 @@ terminating with the ".png" suffix:
 ffmpeg -framerate 10 -pattern_type glob -i "*.png" out.mkv
 @end example
 @end itemize
+
+@section mov/mp4/3gp/Quicktme
+
+Quicktime / MP4 demuxer.
+
+This demuxer accepts the following options:
+@table @option
+@item enable_drefs
+Enable loading of external tracks, disabled by default.
+Enabling this can theoretically leak information in some use cases.
+
+@item use_absolute_path
+Allows loading of external tracks via absolute paths, disabled by default.
+Enabling this poses a security risk. It should only be enabled if the source
+is known to be non malicious.
+
+@end table
 
 @section mpegts
 

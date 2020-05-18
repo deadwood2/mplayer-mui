@@ -70,7 +70,7 @@ static int sse_mb(MpegEncContext *s);
 static void denoise_dct_c(MpegEncContext *s, int16_t *block);
 static int dct_quantize_trellis_c(MpegEncContext *s, int16_t *block, int n, int qscale, int *overflow);
 
-static uint8_t default_mv_penalty[MAX_FCODE + 1][MAX_MV * 2 + 1];
+static uint8_t default_mv_penalty[MAX_FCODE + 1][MAX_DMV * 2 + 1];
 static uint8_t default_fcode_tab[MAX_MV * 2 + 1];
 
 const AVOption ff_mpv_generic_options[] = {
@@ -315,6 +315,7 @@ av_cold int ff_mpv_encode_init(AVCodecContext *avctx)
         break;
     }
 
+    avctx->bits_per_raw_sample = av_clip(avctx->bits_per_raw_sample, 0, 8);
     s->bit_rate = avctx->bit_rate;
     s->width    = avctx->width;
     s->height   = avctx->height;
@@ -1130,7 +1131,7 @@ static int load_input_picture(MpegEncContext *s, const AVFrame *pic_arg)
         if (s->linesize & (STRIDE_ALIGN-1))
             direct = 0;
 
-        ff_dlog(s->avctx, "%d %d %"PTRDIFF_SPECIFIER" %"PTRDIFF_SPECIFIER"\n", pic_arg->linesize[0],
+        av_dlog(s->avctx, "%d %d %"PTRDIFF_SPECIFIER" %"PTRDIFF_SPECIFIER"\n", pic_arg->linesize[0],
                 pic_arg->linesize[1], s->linesize, s->uvlinesize);
 
         i = ff_find_unused_picture(s, direct);
@@ -1143,12 +1144,14 @@ static int load_input_picture(MpegEncContext *s, const AVFrame *pic_arg)
         if (direct) {
             if ((ret = av_frame_ref(pic->f, pic_arg)) < 0)
                 return ret;
-        }
-        ret = ff_alloc_picture(s, pic, direct);
-        if (ret < 0)
-            return ret;
+            if (ff_alloc_picture(s, pic, 1) < 0) {
+                return -1;
+            }
+        } else {
+            if (ff_alloc_picture(s, pic, 0) < 0) {
+                return -1;
+            }
 
-        if (!direct) {
             if (pic->f->data[0] + INPLACE_OFFSET == pic_arg->data[0] &&
                 pic->f->data[1] + INPLACE_OFFSET == pic_arg->data[1] &&
                 pic->f->data[2] + INPLACE_OFFSET == pic_arg->data[2]) {
@@ -1281,8 +1284,6 @@ static int estimate_best_b_count(MpegEncContext *s)
     int64_t best_rd  = INT64_MAX;
     int best_b_count = -1;
 
-    if (!c)
-        return AVERROR(ENOMEM);
     av_assert0(scale >= 0 && scale <= 3);
 
     //emms_c();
@@ -2721,6 +2722,40 @@ static void update_mb_info(MpegEncContext *s, int startcode)
     write_mb_info(s);
 }
 
+int ff_mpv_reallocate_putbitbuffer(MpegEncContext *s, size_t threshold, size_t size_increase)
+{
+    if (   s->pb.buf_end - s->pb.buf - (put_bits_count(&s->pb)>>3) < threshold
+        && s->slice_context_count == 1
+        && s->pb.buf == s->avctx->internal->byte_buffer) {
+        int lastgob_pos = s->ptr_lastgob - s->pb.buf;
+        int vbv_pos     = s->vbv_delay_ptr - s->pb.buf;
+
+        uint8_t *new_buffer = NULL;
+        int new_buffer_size = 0;
+
+        if ((s->avctx->internal->byte_buffer_size + size_increase) >= INT_MAX/8) {
+            av_log(s->avctx, AV_LOG_ERROR, "Cannot reallocate putbit buffer\n");
+            return AVERROR(ENOMEM);
+        }
+
+        av_fast_padded_malloc(&new_buffer, &new_buffer_size,
+                              s->avctx->internal->byte_buffer_size + size_increase);
+        if (!new_buffer)
+            return AVERROR(ENOMEM);
+
+        memcpy(new_buffer, s->avctx->internal->byte_buffer, s->avctx->internal->byte_buffer_size);
+        av_free(s->avctx->internal->byte_buffer);
+        s->avctx->internal->byte_buffer      = new_buffer;
+        s->avctx->internal->byte_buffer_size = new_buffer_size;
+        rebase_put_bits(&s->pb, new_buffer, new_buffer_size);
+        s->ptr_lastgob   = s->pb.buf + lastgob_pos;
+        s->vbv_delay_ptr = s->pb.buf + vbv_pos;
+    }
+    if (s->pb.buf_end - s->pb.buf - (put_bits_count(&s->pb)>>3) < threshold)
+        return AVERROR(EINVAL);
+    return 0;
+}
+
 static int encode_thread(AVCodecContext *c, void *arg){
     MpegEncContext *s= *(void**)arg;
     int mb_x, mb_y, pdif = 0;
@@ -2772,7 +2807,7 @@ static int encode_thread(AVCodecContext *c, void *arg){
     case AV_CODEC_ID_H263P:
     case AV_CODEC_ID_FLV1:
         if (CONFIG_H263_ENCODER)
-            s->gob_index = H263_GOB_HEIGHT(s->height);
+            s->gob_index = ff_h263_get_gob_height(s);
         break;
     case AV_CODEC_ID_MPEG4:
         if(CONFIG_MPEG4_ENCODER && s->partitioned_frame)
@@ -2797,30 +2832,10 @@ static int encode_thread(AVCodecContext *c, void *arg){
 //            int d;
             int dmin= INT_MAX;
             int dir;
+            int size_increase =  s->avctx->internal->byte_buffer_size/4
+                               + s->mb_width*MAX_MB_BYTES;
 
-            if (   s->pb.buf_end - s->pb.buf - (put_bits_count(&s->pb)>>3) < MAX_MB_BYTES
-                && s->slice_context_count == 1
-                && s->pb.buf == s->avctx->internal->byte_buffer) {
-                int new_size =  s->avctx->internal->byte_buffer_size
-                              + s->avctx->internal->byte_buffer_size/4
-                              + s->mb_width*MAX_MB_BYTES;
-                int lastgob_pos = s->ptr_lastgob - s->pb.buf;
-                int vbv_pos     = s->vbv_delay_ptr - s->pb.buf;
-
-                uint8_t *new_buffer = NULL;
-                int new_buffer_size = 0;
-
-                av_fast_padded_malloc(&new_buffer, &new_buffer_size, new_size);
-                if (new_buffer) {
-                    memcpy(new_buffer, s->avctx->internal->byte_buffer, s->avctx->internal->byte_buffer_size);
-                    av_free(s->avctx->internal->byte_buffer);
-                    s->avctx->internal->byte_buffer      = new_buffer;
-                    s->avctx->internal->byte_buffer_size = new_buffer_size;
-                    rebase_put_bits(&s->pb, new_buffer, new_buffer_size);
-                    s->ptr_lastgob   = s->pb.buf + lastgob_pos;
-                    s->vbv_delay_ptr = s->pb.buf + vbv_pos;
-                }
-            }
+            ff_mpv_reallocate_putbitbuffer(s, MAX_MB_BYTES, size_increase);
             if(s->pb.buf_end - s->pb.buf - (put_bits_count(&s->pb)>>3) < MAX_MB_BYTES){
                 av_log(s->avctx, AV_LOG_ERROR, "encoded frame too large\n");
                 return -1;
@@ -3359,7 +3374,7 @@ static int encode_thread(AVCodecContext *c, void *arg){
                 if(CONFIG_H263_ENCODER && s->out_format == FMT_H263)
                     ff_h263_loop_filter(s);
             }
-            ff_dlog(s->avctx, "MB %d %d bits\n",
+            av_dlog(s->avctx, "MB %d %d bits\n",
                     s->mb_x + s->mb_y * s->mb_stride, put_bits_count(&s->pb));
         }
     }
@@ -3566,7 +3581,7 @@ static int encode_picture(MpegEncContext *s, int picture_number)
             s->mb_type[i]= CANDIDATE_MB_TYPE_INTRA;
         if(s->msmpeg4_version >= 3)
             s->no_rounding=1;
-        ff_dlog(s, "Scene change detected, encoding as I Frame %"PRId64" %"PRId64"\n",
+        av_dlog(s, "Scene change detected, encoding as I Frame %"PRId64" %"PRId64"\n",
                 s->current_picture.mb_var_sum, s->current_picture.mc_mb_var_sum);
     }
 
@@ -3704,9 +3719,11 @@ static int encode_picture(MpegEncContext *s, int picture_number)
             ff_wmv2_encode_picture_header(s, picture_number);
         else if (CONFIG_MSMPEG4_ENCODER && s->msmpeg4_version)
             ff_msmpeg4_encode_picture_header(s, picture_number);
-        else if (CONFIG_MPEG4_ENCODER && s->h263_pred)
-            ff_mpeg4_encode_picture_header(s, picture_number);
-        else if (CONFIG_RV10_ENCODER && s->codec_id == AV_CODEC_ID_RV10) {
+        else if (CONFIG_MPEG4_ENCODER && s->h263_pred) {
+            ret = ff_mpeg4_encode_picture_header(s, picture_number);
+            if (ret < 0)
+                return ret;
+        } else if (CONFIG_RV10_ENCODER && s->codec_id == AV_CODEC_ID_RV10) {
             ret = ff_rv10_encode_picture_header(s, picture_number);
             if (ret < 0)
                 return ret;
@@ -3733,6 +3750,8 @@ static int encode_picture(MpegEncContext *s, int picture_number)
     }
     s->avctx->execute(s->avctx, encode_thread, &s->thread_context[0], NULL, context_count, sizeof(void*));
     for(i=1; i<context_count; i++){
+        if (s->pb.buf_end == s->thread_context[i]->pb.buf)
+            set_put_bits_buffer_size(&s->pb, FFMIN(s->thread_context[i]->pb.buf_end - s->pb.buf, INT_MAX/8-32));
         merge_context_after_encode(s, s->thread_context[i]);
     }
     emms_c();

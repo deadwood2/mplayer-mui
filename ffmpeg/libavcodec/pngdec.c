@@ -539,6 +539,11 @@ static int decode_ihdr_chunk(AVCodecContext *avctx, PNGDecContext *s,
         return AVERROR_INVALIDDATA;
     }
 
+    if (s->state & PNG_IHDR) {
+        av_log(avctx, AV_LOG_ERROR, "Multiple IHDR\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     s->width  = s->cur_w = bytestream2_get_be32(&s->gb);
     s->height = s->cur_h = bytestream2_get_be32(&s->gb);
     if (av_image_check_size(s->width, s->height, 0, avctx)) {
@@ -651,7 +656,7 @@ static int decode_idat_chunk(AVCodecContext *avctx, PNGDecContext *s,
                     s->cur_w);
             s->crow_size = s->pass_row_size + 1;
         }
-        ff_dlog(avctx, "row_size=%d crow_size =%d\n",
+        av_dlog(avctx, "row_size=%d crow_size =%d\n",
                 s->row_size, s->crow_size);
         s->image_buf      = p->data[0];
         s->image_linesize = p->linesize[0];
@@ -805,28 +810,34 @@ static int decode_fctl_chunk(AVCodecContext *avctx, PNGDecContext *s,
                              uint32_t length)
 {
     uint32_t sequence_number;
+    int cur_w, cur_h, x_offset, y_offset, dispose_op, blend_op;
 
     if (length != 26)
         return AVERROR_INVALIDDATA;
 
+    if (!(s->state & PNG_IHDR)) {
+        av_log(avctx, AV_LOG_ERROR, "fctl before IHDR\n");
+        return AVERROR_INVALIDDATA;
+    }
+
     sequence_number = bytestream2_get_be32(&s->gb);
-    s->cur_w        = bytestream2_get_be32(&s->gb);
-    s->cur_h        = bytestream2_get_be32(&s->gb);
-    s->x_offset     = bytestream2_get_be32(&s->gb);
-    s->y_offset     = bytestream2_get_be32(&s->gb);
+    cur_w           = bytestream2_get_be32(&s->gb);
+    cur_h           = bytestream2_get_be32(&s->gb);
+    x_offset        = bytestream2_get_be32(&s->gb);
+    y_offset        = bytestream2_get_be32(&s->gb);
     bytestream2_skip(&s->gb, 4); /* delay_num (2), delay_den (2) */
-    s->dispose_op   = bytestream2_get_byte(&s->gb);
-    s->blend_op     = bytestream2_get_byte(&s->gb);
+    dispose_op      = bytestream2_get_byte(&s->gb);
+    blend_op        = bytestream2_get_byte(&s->gb);
     bytestream2_skip(&s->gb, 4); /* crc */
 
     if (sequence_number == 0 &&
-        (s->cur_w != s->width ||
-         s->cur_h != s->height ||
-         s->x_offset != 0 ||
-         s->y_offset != 0) ||
-        s->cur_w <= 0 || s->cur_h <= 0 ||
-        s->x_offset < 0 || s->y_offset < 0 ||
-        s->cur_w > s->width - s->x_offset|| s->cur_h > s->height - s->y_offset)
+        (cur_w != s->width ||
+         cur_h != s->height ||
+         x_offset != 0 ||
+         y_offset != 0) ||
+        cur_w <= 0 || cur_h <= 0 ||
+        x_offset < 0 || y_offset < 0 ||
+        cur_w > s->width - x_offset|| cur_h > s->height - y_offset)
             return AVERROR_INVALIDDATA;
 
     /* always (re)start with a clean frame */
@@ -839,6 +850,13 @@ static int decode_fctl_chunk(AVCodecContext *avctx, PNGDecContext *s,
             /* previous for the second frame is the first frame */
             s->dispose_op = APNG_DISPOSE_OP_NONE;
     }
+
+    s->cur_w      = cur_w;
+    s->cur_h      = cur_h;
+    s->x_offset   = x_offset;
+    s->y_offset   = y_offset;
+    s->dispose_op = dispose_op;
+    s->blend_op   = blend_op;
 
     return 0;
 }
@@ -1242,8 +1260,6 @@ static int update_thread_context(AVCodecContext *dst, const AVCodecContext *src)
 static av_cold int png_dec_init(AVCodecContext *avctx)
 {
     PNGDecContext *s = avctx->priv_data;
-
-    avctx->color_range = AVCOL_RANGE_JPEG;
 
     s->avctx = avctx;
     s->previous_picture.f = av_frame_alloc();

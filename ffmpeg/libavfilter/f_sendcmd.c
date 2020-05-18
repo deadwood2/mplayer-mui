@@ -318,9 +318,6 @@ static int parse_intervals(Interval **intervals, int *nb_intervals,
     *intervals = NULL;
     *nb_intervals = 0;
 
-    if (!buf)
-        return 0;
-
     while (1) {
         Interval interval;
 
@@ -376,9 +373,9 @@ static av_cold int init(AVFilterContext *ctx)
     SendCmdContext *sendcmd = ctx->priv;
     int ret, i, j;
 
-    if ((!!sendcmd->commands_filename + !!sendcmd->commands_str) != 1) {
+    if (sendcmd->commands_filename && sendcmd->commands_str) {
         av_log(ctx, AV_LOG_ERROR,
-               "One and only one of the filename or commands options must be specified\n");
+               "Only one of the filename or commands options must be specified\n");
         return AVERROR(EINVAL);
     }
 
@@ -407,7 +404,7 @@ static av_cold int init(AVFilterContext *ctx)
         return ret;
 
     if (sendcmd->nb_intervals == 0) {
-        av_log(ctx, AV_LOG_ERROR, "No commands were specified\n");
+        av_log(ctx, AV_LOG_ERROR, "No commands\n");
         return AVERROR(EINVAL);
     }
 

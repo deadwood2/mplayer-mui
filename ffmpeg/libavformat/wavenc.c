@@ -82,7 +82,7 @@ typedef struct WAVMuxContext {
     int write_peak;
     int rf64;
     int peak_block_size;
-    int peak_format;
+    PeakFormat peak_format;
     int peak_block_pos;
     int peak_ppv;
     int peak_bps;
@@ -92,7 +92,7 @@ typedef struct WAVMuxContext {
 static inline void bwf_write_bext_string(AVFormatContext *s, const char *key, int maxlen)
 {
     AVDictionaryEntry *tag;
-    size_t len = 0;
+    int len = 0;
 
     if (tag = av_dict_get(s->metadata, key, NULL, 0)) {
         len = strlen(tag->value);
@@ -120,11 +120,11 @@ static void bwf_write_bext_chunk(AVFormatContext *s)
     avio_wl64(s->pb, time_reference);
     avio_wl16(s->pb, 1);  // set version to 1
 
-    if ((tmp_tag = av_dict_get(s->metadata, "umid", NULL, 0)) && strlen(tmp_tag->value) > 2) {
+    if (tmp_tag = av_dict_get(s->metadata, "umid", NULL, 0)) {
         unsigned char umidpart_str[17] = {0};
-        int64_t i;
+        int i;
         uint64_t umidpart;
-        size_t len = strlen(tmp_tag->value+2);
+        int len = strlen(tmp_tag->value+2);
 
         for (i = 0; i < len/16; i++) {
             memcpy(umidpart_str, tmp_tag->value + 2 + (i*16), 16);

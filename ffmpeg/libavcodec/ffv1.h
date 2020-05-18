@@ -117,6 +117,7 @@ typedef struct FFV1Context {
 
     struct FFV1Context *slice_context[MAX_SLICES];
     int slice_count;
+    int max_slice_count;
     int num_v_slices;
     int num_h_slices;
     int slice_width;
@@ -143,7 +144,7 @@ static av_always_inline int fold(int diff, int bits)
         diff = (int8_t)diff;
     else {
         diff +=  1 << (bits  - 1);
-        diff  = av_mod_uintp2(diff, bits);
+        diff &= (1 <<  bits) - 1;
         diff -=  1 << (bits  - 1);
     }
 

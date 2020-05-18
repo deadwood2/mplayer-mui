@@ -176,7 +176,7 @@ static av_always_inline PutBitContext *dv_encode_ac(EncBlockInfo *bi,
             if (bits_left) {
                 size -= bits_left;
                 put_bits(pb, bits_left, vlc >> size);
-                vlc = av_mod_uintp2(vlc, size);
+                vlc = vlc & ((1 << size) - 1);
             }
             if (pb + 1 >= pb_end) {
                 bi->partial_bit_count  = size;

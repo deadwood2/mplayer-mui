@@ -262,7 +262,7 @@ static void rtcp_send_sr(AVFormatContext *s1, int64_t ntp_time, int bye)
     RTPMuxContext *s = s1->priv_data;
     uint32_t rtp_ts;
 
-    av_log(s1, AV_LOG_TRACE, "RTCP: %02x %"PRIx64" %x\n", s->payload_type, ntp_time, s->timestamp);
+    av_dlog(s1, "RTCP: %02x %"PRIx64" %x\n", s->payload_type, ntp_time, s->timestamp);
 
     s->last_rtcp_ntp_time = ntp_time;
     rtp_ts = av_rescale_q(ntp_time - s->first_rtcp_ntp_time, (AVRational){1, 1000000},
@@ -271,7 +271,8 @@ static void rtcp_send_sr(AVFormatContext *s1, int64_t ntp_time, int bye)
     avio_w8(s1->pb, RTCP_SR);
     avio_wb16(s1->pb, 6); /* length in words - 1 */
     avio_wb32(s1->pb, s->ssrc);
-    avio_wb64(s1->pb, NTP_TO_RTP_FORMAT(ntp_time));
+    avio_wb32(s1->pb, ntp_time / 1000000);
+    avio_wb32(s1->pb, ((ntp_time % 1000000) << 32) / 1000000);
     avio_wb32(s1->pb, rtp_ts);
     avio_wb32(s1->pb, s->packet_count);
     avio_wb32(s1->pb, s->octet_count);
@@ -307,7 +308,7 @@ void ff_rtp_send_data(AVFormatContext *s1, const uint8_t *buf1, int len, int m)
 {
     RTPMuxContext *s = s1->priv_data;
 
-    av_log(s1, AV_LOG_TRACE, "rtp_send_data size=%d\n", len);
+    av_dlog(s1, "rtp_send_data size=%d\n", len);
 
     /* build the RTP header */
     avio_w8(s1->pb, RTP_VERSION << 6);
@@ -495,7 +496,7 @@ static int rtp_write_packet(AVFormatContext *s1, AVPacket *pkt)
     int rtcp_bytes;
     int size= pkt->size;
 
-    av_log(s1, AV_LOG_TRACE, "%d: write len=%d\n", pkt->stream_index, size);
+    av_dlog(s1, "%d: write len=%d\n", pkt->stream_index, size);
 
     rtcp_bytes = ((s->octet_count - s->last_octet_count) * RTCP_TX_RATIO_NUM) /
         RTCP_TX_RATIO_DEN;
@@ -561,10 +562,6 @@ static int rtp_write_packet(AVFormatContext *s1, AVPacket *pkt)
             const uint8_t *mb_info =
                 av_packet_get_side_data(pkt, AV_PKT_DATA_H263_MB_INFO,
                                         &mb_info_size);
-            if (!mb_info) {
-                av_log(s1, AV_LOG_ERROR, "failed to allocate side data\n");
-                return AVERROR(ENOMEM);
-            }
             ff_rtp_send_h263_rfc2190(s1, pkt->data, size, mb_info, mb_info_size);
             break;
         }

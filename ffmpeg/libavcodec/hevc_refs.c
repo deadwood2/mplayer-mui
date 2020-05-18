@@ -174,7 +174,7 @@ int ff_hevc_output_frame(HEVCContext *s, AVFrame *out, int flush)
         int min_poc   = INT_MAX;
         int i, min_idx, ret;
 
-        if (s->sh.no_output_of_prior_pics_flag == 1) {
+        if (s->sh.no_output_of_prior_pics_flag == 1 && s->no_rasl_output_flag == 1) {
             for (i = 0; i < FF_ARRAY_ELEMS(s->DPB); i++) {
                 HEVCFrame *frame = &s->DPB[i];
                 if (!(frame->flags & HEVC_FRAME_FLAG_BUMPING) && frame->poc != s->poc &&
@@ -386,9 +386,8 @@ static HEVCFrame *find_ref_idx(HEVCContext *s, int poc)
         }
     }
 
-    if (s->nal_unit_type != NAL_CRA_NUT && !IS_BLA(s))
-        av_log(s->avctx, AV_LOG_ERROR,
-               "Could not find ref with POC %d\n", poc);
+    av_log(s->avctx, AV_LOG_ERROR,
+           "Could not find ref with POC %d\n", poc);
     return NULL;
 }
 

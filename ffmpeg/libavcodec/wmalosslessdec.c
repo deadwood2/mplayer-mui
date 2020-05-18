@@ -210,8 +210,8 @@ static av_cold int decode_init(AVCodecContext *avctx)
         }
         /* dump the extradata */
         for (i = 0; i < avctx->extradata_size; i++)
-            ff_dlog(avctx, "[%x] ", avctx->extradata[i]);
-        ff_dlog(avctx, "\n");
+            av_dlog(avctx, "[%x] ", avctx->extradata[i]);
+        av_dlog(avctx, "\n");
 
     } else {
         avpriv_request_sample(avctx, "Unsupported extradata size");
@@ -488,7 +488,7 @@ static int decode_cdlms(WmallDecodeCtx *s)
                 if ((1 << cbits) < s->cdlms[c][i].scaling + 1)
                     cbits++;
 
-                s->cdlms[c][i].bitsend = get_bits(&s->gb, cbits) + 2;
+                s->cdlms[c][i].bitsend = (cbits ? get_bits(&s->gb, cbits) : 0) + 2;
                 shift_l = 32 - s->cdlms[c][i].bitsend;
                 shift_r = 32 - s->cdlms[c][i].scaling - 2;
                 for (j = 0; j < s->cdlms[c][i].coefsend; j++)
@@ -932,7 +932,7 @@ static int decode_subframe(WmallDecodeCtx *s)
                    "Invalid number of padding bits in raw PCM tile\n");
             return AVERROR_INVALIDDATA;
         }
-        ff_dlog(s->avctx, "RAWPCM %d bits per sample. "
+        av_dlog(s->avctx, "RAWPCM %d bits per sample. "
                 "total %d bits, remain=%d\n", bits,
                 bits * s->num_channels * subframe_len, get_bits_count(&s->gb));
         for (i = 0; i < s->num_channels; i++)
@@ -1005,6 +1005,7 @@ static int decode_frame(WmallDecodeCtx *s)
     if ((ret = ff_get_buffer(s->avctx, s->frame, 0)) < 0) {
         /* return an error if no frame could be decoded at all */
         s->packet_loss = 1;
+        s->frame->nb_samples = 0;
         return ret;
     }
     for (i = 0; i < s->num_channels; i++) {
@@ -1035,13 +1036,13 @@ static int decode_frame(WmallDecodeCtx *s)
         /* usually true for the first frame */
         if (get_bits1(gb)) {
             skip = get_bits(gb, av_log2(s->samples_per_frame * 2));
-            ff_dlog(s->avctx, "start skip: %i\n", skip);
+            av_dlog(s->avctx, "start skip: %i\n", skip);
         }
 
         /* sometimes true for the last frame */
         if (get_bits1(gb)) {
             skip = get_bits(gb, av_log2(s->samples_per_frame * 2));
-            ff_dlog(s->avctx, "end skip: %i\n", skip);
+            av_dlog(s->avctx, "end skip: %i\n", skip);
         }
 
     }
@@ -1064,7 +1065,7 @@ static int decode_frame(WmallDecodeCtx *s)
         }
     }
 
-    ff_dlog(s->avctx, "Frame done\n");
+    av_dlog(s->avctx, "Frame done\n");
 
     s->skip_frame = 0;
 
@@ -1213,7 +1214,7 @@ static int decode_packet(AVCodecContext *avctx, void *data, int *got_frame_ptr,
             if (num_bits_prev_frame < remaining_packet_bits && !s->packet_loss)
                 decode_frame(s);
         } else if (s->num_saved_bits - s->frame_offset) {
-            ff_dlog(avctx, "ignoring %x previously saved bits\n",
+            av_dlog(avctx, "ignoring %x previously saved bits\n",
                     s->num_saved_bits - s->frame_offset);
         }
 

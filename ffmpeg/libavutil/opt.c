@@ -85,9 +85,8 @@ static int write_number(void *obj, const AVOption *o, void *dst, double num, int
 {
     if (o->type != AV_OPT_TYPE_FLAGS &&
         (o->max * den < num * intnum || o->min * den > num * intnum)) {
-        num = den ? num*intnum/den : (num*intnum ? INFINITY : NAN);
         av_log(obj, AV_LOG_ERROR, "Value %f for parameter '%s' out of range [%g - %g]\n",
-               num, o->name, o->min, o->max);
+               num*intnum/den, o->name, o->min, o->max);
         return AVERROR(ERANGE);
     }
     if (o->type == AV_OPT_TYPE_FLAGS) {
@@ -1464,10 +1463,11 @@ int av_opt_set_dict2(void *obj, AVDictionary **options, int search_flags)
     while ((t = av_dict_get(*options, "", t, AV_DICT_IGNORE_SUFFIX))) {
         ret = av_opt_set(obj, t->key, t->value, search_flags);
         if (ret == AVERROR_OPTION_NOT_FOUND)
-            av_dict_set(&tmp, t->key, t->value, 0);
-        else if (ret < 0) {
+            ret = av_dict_set(&tmp, t->key, t->value, 0);
+        if (ret < 0) {
             av_log(obj, AV_LOG_ERROR, "Error setting option %s to value %s.\n", t->key, t->value);
-            break;
+            av_dict_free(&tmp);
+            return ret;
         }
         ret = 0;
     }

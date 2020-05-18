@@ -38,10 +38,9 @@ typedef struct {
     int first_field;
     char *pattern;
     unsigned int pattern_pos;
-    int64_t start_time;
 
     AVRational pts;
-    AVRational ts_unit;
+    double ts_unit;
     int out_cnt;
     int occupied;
 
@@ -90,8 +89,6 @@ static av_cold int init(AVFilterContext *ctx)
         s->pts.den += *p - '0';
     }
 
-    s->start_time = AV_NOPTS_VALUE;
-
     s->out_cnt = (max + 1) / 2;
     av_log(ctx, AV_LOG_INFO, "Telecine pattern %s yields up to %d frames per frame, pts advance factor: %d/%d\n",
            s->pattern, s->out_cnt, s->pts.num, s->pts.den);
@@ -112,7 +109,8 @@ static int query_formats(AVFilterContext *ctx)
             ff_add_format(&pix_fmts, fmt);
     }
 
-    return ff_set_common_formats(ctx, pix_fmts);
+    ff_set_common_formats(ctx, pix_fmts);
+    return 0;
 }
 
 static int config_input(AVFilterLink *inlink)
@@ -163,7 +161,7 @@ static int config_output(AVFilterLink *outlink)
     av_log(ctx, AV_LOG_VERBOSE, "TB: %d/%d -> %d/%d\n",
            inlink->time_base.num, inlink->time_base.den, outlink->time_base.num, outlink->time_base.den);
 
-    s->ts_unit = av_inv_q(av_mul_q(fps, outlink->time_base));
+    s->ts_unit = av_q2d(av_inv_q(av_mul_q(fps, outlink->time_base)));
 
     return 0;
 }
@@ -174,9 +172,6 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *inpicref)
     AVFilterLink *outlink = ctx->outputs[0];
     TelecineContext *s = ctx->priv;
     int i, len, ret = 0, nout = 0;
-
-    if (s->start_time == AV_NOPTS_VALUE)
-        s->start_time = inpicref->pts;
 
     len = s->pattern[s->pattern_pos] - '0';
 
@@ -240,10 +235,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *inpicref)
             return AVERROR(ENOMEM);
         }
 
-        av_frame_copy_props(frame, inpicref);
-        frame->pts = ((s->start_time == AV_NOPTS_VALUE) ? 0 : s->start_time) +
-                     av_rescale(outlink->frame_count, s->ts_unit.num,
-                                s->ts_unit.den);
+        frame->pts = outlink->frame_count * s->ts_unit;
         ret = ff_filter_frame(outlink, frame);
     }
     av_frame_free(&inpicref);

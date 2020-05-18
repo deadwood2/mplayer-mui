@@ -193,13 +193,13 @@ static int mpeg4_decode_sprite_trajectory(Mpeg4DecContext *ctx, GetBitContext *g
             x = get_xbits(gb, length);
 
         if (!(ctx->divx_version == 500 && ctx->divx_build == 413))
-            check_marker(gb, "before sprite_trajectory");
+            skip_bits1(gb);     /* marker bit */
 
         length = get_vlc2(gb, sprite_trajectory.table, SPRITE_TRAJ_VLC_BITS, 3);
         if (length > 0)
             y = get_xbits(gb, length);
 
-        check_marker(gb, "after sprite_trajectory");
+        skip_bits1(gb);         /* marker bit */
         ctx->sprite_traj[i][0] = d[i][0] = x;
         ctx->sprite_traj[i][1] = d[i][1] = y;
     }
@@ -881,7 +881,7 @@ int ff_mpeg4_decode_partitions(Mpeg4DecContext *ctx)
     const int part_a_end   = s->pict_type == AV_PICTURE_TYPE_I ? (ER_DC_END   | ER_MV_END)   : ER_MV_END;
 
     mb_num = mpeg4_decode_partition_a(ctx);
-    if (mb_num < 0) {
+    if (mb_num <= 0) {
         ff_er_add_slice(&s->er, s->resync_mb_x, s->resync_mb_y,
                         s->mb_x, s->mb_y, part_a_error);
         return -1;
@@ -1169,7 +1169,7 @@ static inline int mpeg4_decode_block(Mpeg4DecContext *ctx, int16_t *block,
                 level = (level ^ SHOW_SBITS(re, &s->gb, 1)) - SHOW_SBITS(re, &s->gb, 1);
                 LAST_SKIP_BITS(re, &s->gb, 1);
             }
-            ff_tlog(s->avctx, "dct[%d][%d] = %- 4d end?:%d\n", scan_table[i&63]&7, scan_table[i&63] >> 3, level, i>62);
+            tprintf(s->avctx, "dct[%d][%d] = %- 4d end?:%d\n", scan_table[i&63]&7, scan_table[i&63] >> 3, level, i>62);
             if (i > 62) {
                 i -= 192;
                 if (i & (~63)) {
@@ -1677,7 +1677,7 @@ static int mpeg4_decode_gop_header(MpegEncContext *s, GetBitContext *gb)
 
     hours   = get_bits(gb, 5);
     minutes = get_bits(gb, 6);
-    check_marker(gb, "in gop_header");
+    skip_bits1(gb);
     seconds = get_bits(gb, 6);
 
     s->time_base = seconds + 60*(minutes + 60*hours);
@@ -1732,16 +1732,16 @@ static int decode_vol_header(Mpeg4DecContext *ctx, GetBitContext *gb)
         s->low_delay = get_bits1(gb);
         if (get_bits1(gb)) {    /* vbv parameters */
             get_bits(gb, 15);   /* first_half_bitrate */
-            check_marker(gb, "after first_half_bitrate");
+            skip_bits1(gb);     /* marker */
             get_bits(gb, 15);   /* latter_half_bitrate */
-            check_marker(gb, "after latter_half_bitrate");
+            skip_bits1(gb);     /* marker */
             get_bits(gb, 15);   /* first_half_vbv_buffer_size */
-            check_marker(gb, "after first_half_vbv_buffer_size");
+            skip_bits1(gb);     /* marker */
             get_bits(gb, 3);    /* latter_half_vbv_buffer_size */
             get_bits(gb, 11);   /* first_half_vbv_occupancy */
-            check_marker(gb, "after first_half_vbv_occupancy");
+            skip_bits1(gb);     /* marker */
             get_bits(gb, 15);   /* latter_half_vbv_occupancy */
-            check_marker(gb, "after latter_half_vbv_occupancy");
+            skip_bits1(gb);     /* marker */
         }
     } else {
         /* is setting low delay flag only once the smartest thing to do?
@@ -1815,13 +1815,13 @@ static int decode_vol_header(Mpeg4DecContext *ctx, GetBitContext *gb)
             ctx->vol_sprite_usage == GMC_SPRITE) {
             if (ctx->vol_sprite_usage == STATIC_SPRITE) {
                 skip_bits(gb, 13); // sprite_width
-                check_marker(gb, "after sprite_width");
+                skip_bits1(gb); /* marker */
                 skip_bits(gb, 13); // sprite_height
-                check_marker(gb, "after sprite_height");
+                skip_bits1(gb); /* marker */
                 skip_bits(gb, 13); // sprite_left
-                check_marker(gb, "after sprite_left");
+                skip_bits1(gb); /* marker */
                 skip_bits(gb, 13); // sprite_top
-                check_marker(gb, "after sprite_top");
+                skip_bits1(gb); /* marker */
             }
             ctx->num_sprite_warping_points = get_bits(gb, 6);
             if (ctx->num_sprite_warping_points > 3) {
@@ -1874,6 +1874,10 @@ static int decode_vol_header(Mpeg4DecContext *ctx, GetBitContext *gb)
                 int last = 0;
                 for (i = 0; i < 64; i++) {
                     int j;
+                    if (get_bits_left(gb) < 8) {
+                        av_log(s->avctx, AV_LOG_ERROR, "insufficient data for custom matrix\n");
+                        return AVERROR_INVALIDDATA;
+                    }
                     v = get_bits(gb, 8);
                     if (v == 0)
                         break;
@@ -1897,6 +1901,10 @@ static int decode_vol_header(Mpeg4DecContext *ctx, GetBitContext *gb)
                 int last = 0;
                 for (i = 0; i < 64; i++) {
                     int j;
+                    if (get_bits_left(gb) < 8) {
+                        av_log(s->avctx, AV_LOG_ERROR, "insufficient data for custom matrix\n");
+                        return AVERROR_INVALIDDATA;
+                    }
                     v = get_bits(gb, 8);
                     if (v == 0)
                         break;
@@ -2077,6 +2085,12 @@ static int decode_user_data(Mpeg4DecContext *ctx, GetBitContext *gb)
         ctx->divx_version = ver;
         ctx->divx_build   = build;
         s->divx_packed  = e == 3 && last == 'p';
+        if (s->divx_packed && !ctx->showed_packed_warning) {
+            av_log(s->avctx, AV_LOG_INFO, "Video uses a non-standard and "
+                   "wasteful way to store B-frames ('packed B-frames'). "
+                   "Consider using a tool like VirtualDub or avidemux to fix it.\n");
+            ctx->showed_packed_warning = 1;
+        }
     }
 
     /* libavcodec detection */
@@ -2241,8 +2255,8 @@ static int decode_vop_header(Mpeg4DecContext *ctx, GetBitContext *gb)
 
     if (ctx->time_increment_bits == 0 ||
         !(show_bits(gb, ctx->time_increment_bits + 1) & 1)) {
-        av_log(s->avctx, AV_LOG_WARNING,
-               "time_increment_bits %d is invalid in relation to the current bitstream, this is likely caused by a missing VOL header\n", ctx->time_increment_bits);
+        av_log(s->avctx, AV_LOG_ERROR,
+               "hmm, seems the headers are not complete, trying to guess time_increment_bits\n");
 
         for (ctx->time_increment_bits = 1;
              ctx->time_increment_bits < 16;
@@ -2256,8 +2270,8 @@ static int decode_vop_header(Mpeg4DecContext *ctx, GetBitContext *gb)
                 break;
         }
 
-        av_log(s->avctx, AV_LOG_WARNING,
-               "time_increment_bits set to %d bits, based on bitstream analysis\n", ctx->time_increment_bits);
+        av_log(s->avctx, AV_LOG_ERROR,
+               "my guess is %d bits ;)\n", ctx->time_increment_bits);
         if (s->avctx->framerate.num && 4*s->avctx->framerate.num < 1<<ctx->time_increment_bits) {
             s->avctx->framerate.num = 1<<ctx->time_increment_bits;
             s->avctx->time_base = av_inv_q(av_mul_q(s->avctx->framerate, (AVRational){s->avctx->ticks_per_frame, 1}));
@@ -2343,11 +2357,11 @@ static int decode_vop_header(Mpeg4DecContext *ctx, GetBitContext *gb)
     if (ctx->shape != RECT_SHAPE) {
         if (ctx->vol_sprite_usage != 1 || s->pict_type != AV_PICTURE_TYPE_I) {
             skip_bits(gb, 13);  /* width */
-            check_marker(gb, "after width");
+            skip_bits1(gb);     /* marker */
             skip_bits(gb, 13);  /* height */
-            check_marker(gb, "after height");
+            skip_bits1(gb);     /* marker */
             skip_bits(gb, 13);  /* hor_spat_ref */
-            check_marker(gb, "after hor_spat_ref");
+            skip_bits1(gb);     /* marker */
             skip_bits(gb, 13);  /* ver_spat_ref */
         }
         skip_bits1(gb);         /* change_CR_disable */
@@ -2661,12 +2675,6 @@ int ff_mpeg4_frame_end(AVCodecContext *avctx, const uint8_t *buf, int buf_size)
         }
 
         if (startcode_found) {
-            if (!ctx->showed_packed_warning) {
-                av_log(s->avctx, AV_LOG_INFO, "Video uses a non-standard and "
-                       "wasteful way to store B-frames ('packed B-frames'). "
-                       "Consider using the mpeg4_unpack_bframes bitstream filter to fix it.\n");
-                ctx->showed_packed_warning = 1;
-            }
             av_fast_padded_malloc(&s->bitstream_buffer,
                            &s->allocated_bitstream_buffer_size,
                            buf_size - current_pos);

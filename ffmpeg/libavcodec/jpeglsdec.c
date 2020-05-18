@@ -28,7 +28,6 @@
 #include "avcodec.h"
 #include "get_bits.h"
 #include "golomb.h"
-#include "internal.h"
 #include "mathops.h"
 #include "mjpeg.h"
 #include "mjpegdec.h"
@@ -111,20 +110,12 @@ int ff_jpegls_decode_lse(MJpegDecodeContext *s)
         if ((s->avctx->pix_fmt == AV_PIX_FMT_GRAY8 || s->avctx->pix_fmt == AV_PIX_FMT_PAL8) &&
             (s->picture_ptr->format == AV_PIX_FMT_GRAY8 || s->picture_ptr->format == AV_PIX_FMT_PAL8)) {
             uint32_t *pal = (uint32_t *)s->picture_ptr->data[1];
-            int shift = 0;
-
-            if (s->avctx->bits_per_raw_sample > 0 && s->avctx->bits_per_raw_sample < 8) {
-                maxtab = FFMIN(maxtab, (1<<s->avctx->bits_per_raw_sample)-1);
-                shift = 8 - s->avctx->bits_per_raw_sample;
-            }
-
             s->picture_ptr->format =
             s->avctx->pix_fmt = AV_PIX_FMT_PAL8;
             for (i=s->palette_index; i<=maxtab; i++) {
-                uint8_t k = i << shift;
-                pal[k] = 0;
+                pal[i] = 0;
                 for (j=0; j<wt; j++) {
-                    pal[k] |= get_bits(&s->gb, 8) << (8*(wt-j-1));
+                    pal[i] |= get_bits(&s->gb, 8) << (8*(wt-j-1));
                 }
             }
             s->palette_index = i;
@@ -137,7 +128,7 @@ int ff_jpegls_decode_lse(MJpegDecodeContext *s)
         av_log(s->avctx, AV_LOG_ERROR, "invalid id %d\n", id);
         return AVERROR_INVALIDDATA;
     }
-    ff_dlog(s->avctx, "ID=%i, T=%i,%i,%i\n", id, s->t1, s->t2, s->t3);
+    av_dlog(s->avctx, "ID=%i, T=%i,%i,%i\n", id, s->t1, s->t2, s->t3);
 
     return 0;
 }
@@ -280,7 +271,6 @@ static inline void ls_decode_line(JLSState *state, MJpegDecodeContext *s,
 
             if (x >= w) {
                 av_log(NULL, AV_LOG_ERROR, "run overflow\n");
-                av_assert0(x <= w);
                 return;
             }
 
@@ -518,5 +508,4 @@ AVCodec ff_jpegls_decoder = {
     .close          = ff_mjpeg_decode_end,
     .decode         = ff_mjpeg_decode_frame,
     .capabilities   = CODEC_CAP_DR1,
-    .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE,
 };

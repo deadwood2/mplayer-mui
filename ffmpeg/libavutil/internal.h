@@ -47,7 +47,7 @@
 #endif
 
 #ifndef emms_c
-#   define emms_c() while(0)
+#   define emms_c()
 #endif
 
 #ifndef attribute_align_arg
@@ -164,7 +164,7 @@
 
 #include "libm.h"
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
+#if defined(_MSC_VER)
 #pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_strtod")
 #pragma comment(linker, "/include:"EXTERN_PREFIX"avpriv_snprintf")
 #endif

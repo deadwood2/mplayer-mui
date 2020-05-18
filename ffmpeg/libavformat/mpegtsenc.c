@@ -751,11 +751,11 @@ static int mpegts_write_header(AVFormatContext *s)
         ts_st = pcr_st->priv_data;
 
     if (ts->mux_rate > 1) {
-        service->pcr_packet_period = (ts->mux_rate * ts->pcr_period) /
+        service->pcr_packet_period = (int64_t)ts->mux_rate * ts->pcr_period /
                                      (TS_PACKET_SIZE * 8 * 1000);
-        ts->sdt_packet_period      = (ts->mux_rate * SDT_RETRANS_TIME) /
+        ts->sdt_packet_period      = (int64_t)ts->mux_rate * SDT_RETRANS_TIME /
                                      (TS_PACKET_SIZE * 8 * 1000);
-        ts->pat_packet_period      = (ts->mux_rate * PAT_RETRANS_TIME) /
+        ts->pat_packet_period      = (int64_t)ts->mux_rate * PAT_RETRANS_TIME /
                                      (TS_PACKET_SIZE * 8 * 1000);
 
         if (ts->copyts < 1)
@@ -1219,7 +1219,7 @@ int ff_check_h264_startcode(AVFormatContext *s, const AVStream *st, const AVPack
 
 static int check_hevc_startcode(AVFormatContext *s, const AVStream *st, const AVPacket *pkt)
 {
-    if (pkt->size < 5 || AV_RB32(pkt->data) != 0x0000001 && AV_RB24(pkt->data) != 0x000001) {
+    if (pkt->size < 5 || AV_RB32(pkt->data) != 0x0000001) {
         if (!st->nb_frames) {
             av_log(s, AV_LOG_ERROR, "HEVC bitstream malformed, no startcode found\n");
             return AVERROR_PATCHWELCOME;
@@ -1281,7 +1281,7 @@ static int mpegts_write_packet_internal(AVFormatContext *s, AVPacket *pkt)
 
         do {
             p = avpriv_find_start_code(p, buf_end, &state);
-            av_log(s, AV_LOG_TRACE, "nal %d\n", state & 0x1f);
+            av_dlog(s, "nal %d\n", state & 0x1f);
             if ((state & 0x1f) == 7)
                 extradd = 0;
         } while (p < buf_end && (state & 0x1f) != 9 &&
@@ -1356,10 +1356,7 @@ static int mpegts_write_packet_internal(AVFormatContext *s, AVPacket *pkt)
         }
     }
 
-    if (ts_st->payload_size && (ts_st->payload_size + size > ts->pes_payload_size ||
-        (dts != AV_NOPTS_VALUE && ts_st->payload_dts != AV_NOPTS_VALUE &&
-         av_compare_ts(dts - ts_st->payload_dts, st->time_base,
-                       s->max_delay, AV_TIME_BASE_Q) >= 0))) {
+    if (ts_st->payload_size && ts_st->payload_size + size > ts->pes_payload_size) {
         mpegts_write_pes(s, st, ts_st->payload, ts_st->payload_size,
                          ts_st->payload_pts, ts_st->payload_dts,
                          ts_st->payload_flags & AV_PKT_FLAG_KEY);

@@ -260,6 +260,16 @@ static int read_packet(AVFormatContext *s, AVPacket *pkt)
     if (codec->codec_id == AV_CODEC_ID_ADPCM_THP) {
         uint8_t *dst;
 
+        if (!b->adpc) {
+            av_log(s, AV_LOG_ERROR, "adpcm_thp requires ADPC chunk, but none was found.\n");
+            return AVERROR_INVALIDDATA;
+        }
+        if (!b->table) {
+            b->table = av_mallocz(32 * codec->channels);
+            if (!b->table)
+                return AVERROR(ENOMEM);
+        }
+
         if (av_new_packet(pkt, 8 + (32 + 4) * codec->channels + size) < 0)
             return AVERROR(ENOMEM);
         dst = pkt->data;

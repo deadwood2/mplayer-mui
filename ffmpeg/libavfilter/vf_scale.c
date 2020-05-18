@@ -450,9 +450,6 @@ static int filter_frame(AVFilterLink *link, AVFrame *in)
     char buf[32];
     int in_range;
 
-    if (av_frame_get_colorspace(in) == AVCOL_SPC_YCGCO)
-        av_log(link->dst, AV_LOG_WARNING, "Detected unsupported YCgCo colorspace.\n");
-
     if(   in->width  != link->w
        || in->height != link->h
        || in->format != link->format) {
@@ -526,6 +523,8 @@ static int filter_frame(AVFilterLink *link, AVFrame *in)
             sws_setColorspaceDetails(scale->isws[1], inv_table, in_full,
                                      table, out_full,
                                      brightness, contrast, saturation);
+
+        av_frame_set_color_range(out, out_full ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG);
     }
 
     av_reduce(&out->sample_aspect_ratio.num, &out->sample_aspect_ratio.den,

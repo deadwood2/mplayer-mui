@@ -310,10 +310,8 @@ static int request_frame(AVFilterLink *outlink)
 static int query_formats(AVFilterContext *ctx)
 {
     static const enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_MONOBLACK, AV_PIX_FMT_NONE };
-    AVFilterFormats *fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+    return 0;
 }
 
 static const AVFilterPad cellauto_outputs[] = {

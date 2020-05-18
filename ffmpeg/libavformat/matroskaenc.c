@@ -120,7 +120,6 @@ typedef struct MatroskaMuxContext {
     int64_t cluster_time_limit;
     int is_dash;
     int dash_track_number;
-    int is_live;
 
     uint32_t chapter_id_offset;
     int wrote_chapters;
@@ -609,9 +608,8 @@ static int mkv_write_native_codecprivate(AVFormatContext *s,
         return ff_isom_write_avcc(dyn_cp, codec->extradata,
                                   codec->extradata_size);
     case AV_CODEC_ID_HEVC:
-        ff_isom_write_hvcc(dyn_cp, codec->extradata,
-                           codec->extradata_size, 0);
-        return 0;
+        return ff_isom_write_hvcc(dyn_cp, codec->extradata,
+                                  codec->extradata_size, 0);
     case AV_CODEC_ID_ALAC:
         if (codec->extradata_size < 36) {
             av_log(s, AV_LOG_ERROR,
@@ -898,14 +896,18 @@ static int mkv_write_track(AVFormatContext *s, MatroskaMuxContext *mkv,
     }
 
     if (codec->codec_type == AVMEDIA_TYPE_AUDIO && codec->initial_padding && codec->codec_id == AV_CODEC_ID_OPUS) {
+        int64_t codecdelay = av_rescale_q(codec->initial_padding,
+                                          (AVRational){ 1, codec->sample_rate },
+                                          (AVRational){ 1, 1000000000 });
+        if (codecdelay < 0) {
+            av_log(s, AV_LOG_ERROR, "Initial padding is invalid\n");
+            return AVERROR(EINVAL);
+        }
 //         mkv->tracks[i].ts_offset = av_rescale_q(codec->initial_padding,
 //                                                 (AVRational){ 1, codec->sample_rate },
 //                                                 st->time_base);
 
-        put_ebml_uint(pb, MATROSKA_ID_CODECDELAY,
-                      av_rescale_q(codec->initial_padding,
-                                   (AVRational){ 1, codec->sample_rate },
-                                   (AVRational){ 1, 1000000000 }));
+        put_ebml_uint(pb, MATROSKA_ID_CODECDELAY, codecdelay);
     }
     if (codec->codec_id == AV_CODEC_ID_OPUS) {
         put_ebml_uint(pb, MATROSKA_ID_SEEKPREROLL, OPUS_SEEK_PREROLL);
@@ -1083,12 +1085,8 @@ static int mkv_write_chapters(AVFormatContext *s)
         int64_t chapterstart = av_rescale_q(c->start, c->time_base, scale);
         int64_t chapterend   = av_rescale_q(c->end,   c->time_base, scale);
         AVDictionaryEntry *t = NULL;
-        if (chapterstart < 0 || chapterstart > chapterend || chapterend < 0) {
-            av_log(s, AV_LOG_ERROR,
-                   "Invalid chapter start (%"PRId64") or end (%"PRId64").\n",
-                   chapterstart, chapterend);
+        if (chapterstart < 0 || chapterstart > chapterend)
             return AVERROR_INVALIDDATA;
-        }
 
         chapteratom = start_ebml_master(pb, MATROSKA_ID_CHAPTERATOM, 0);
         put_ebml_uint(pb, MATROSKA_ID_CHAPTERUID, c->id + mkv->chapter_id_offset);
@@ -1419,9 +1417,7 @@ static int mkv_write_header(AVFormatContext *s)
     // reserve space for the duration
     mkv->duration = 0;
     mkv->duration_offset = avio_tell(pb);
-    if (!mkv->is_live) {
-        put_ebml_void(pb, 11);              // assumes double-precision float to be written
-    }
+    put_ebml_void(pb, 11);                  // assumes double-precision float to be written
     end_ebml_master(pb, segment_info);
 
     ret = mkv_write_tracks(s);
@@ -1445,7 +1441,7 @@ static int mkv_write_header(AVFormatContext *s)
             return ret;
     }
 
-    if (!s->pb->seekable && !mkv->is_live)
+    if (!s->pb->seekable)
         mkv_write_seekhead(pb, mkv->main_seekhead);
 
     mkv->cues = mkv_start_cues(mkv->segment_offset);
@@ -1964,9 +1960,7 @@ static int mkv_write_trailer(AVFormatContext *s)
         avio_seek(pb, currentpos, SEEK_SET);
     }
 
-    if (!mkv->is_live) {
-        end_ebml_master(pb, mkv->segment);
-    }
+    end_ebml_master(pb, mkv->segment);
     av_freep(&mkv->tracks);
     av_freep(&mkv->cues->entries);
     av_freep(&mkv->cues);
@@ -2030,7 +2024,6 @@ static const AVOption options[] = {
     { "cluster_time_limit",  "Store at most the provided number of milliseconds in a cluster.",                               OFFSET(cluster_time_limit), AV_OPT_TYPE_INT64, { .i64 = -1 }, -1, INT64_MAX, FLAGS },
     { "dash", "Create a WebM file conforming to WebM DASH specification", OFFSET(is_dash), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, FLAGS },
     { "dash_track_number", "Track number for the DASH stream", OFFSET(dash_track_number), AV_OPT_TYPE_INT, { .i64 = 1 }, 0, 127, FLAGS },
-    { "live", "Write files assuming it is a live stream.", OFFSET(is_live), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, FLAGS },
     { "allow_raw_vfw", "allow RAW VFW mode", OFFSET(allow_raw_vfw), AV_OPT_TYPE_INT, { .i64 = 0 }, 0, 1, FLAGS },
     { NULL },
 };

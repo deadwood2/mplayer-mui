@@ -1080,8 +1080,6 @@ AVCodec ff_huffyuv_encoder = {
         AV_PIX_FMT_YUV422P, AV_PIX_FMT_RGB24,
         AV_PIX_FMT_RGB32, AV_PIX_FMT_NONE
     },
-    .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
-                      FF_CODEC_CAP_INIT_CLEANUP,
 };
 
 #if CONFIG_FFVHUFF_ENCODER
@@ -1114,7 +1112,5 @@ AVCodec ff_ffvhuff_encoder = {
         AV_PIX_FMT_RGB24,
         AV_PIX_FMT_RGB32, AV_PIX_FMT_NONE
     },
-    .caps_internal  = FF_CODEC_CAP_INIT_THREADSAFE |
-                      FF_CODEC_CAP_INIT_CLEANUP,
 };
 #endif

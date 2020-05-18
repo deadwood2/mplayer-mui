@@ -14,7 +14,6 @@ patches and related discussions.
 Project Leader
 ==============
 
-Michael Niedermayer
   final design decisions
 
 
@@ -45,7 +44,7 @@ Miscellaneous Areas
 
 documentation                           Stefano Sabatini, Mike Melanson, Timothy Gu
 build system (configure, makefiles)     Diego Biurrun, Mans Rullgard
-project server                          Árpád Gereöffy, Michael Niedermayer, Reimar Doeffinger, Alexander Strasser, Lou Logan
+project server                          Árpád Gereöffy, Michael Niedermayer, Reimar Doeffinger, Alexander Strasser
 presets                                 Robert Swain
 metadata subsystem                      Aurelien Jacobs
 release management                      Michael Niedermayer
@@ -59,7 +58,7 @@ fate.ffmpeg.org                         Timothy Gu
 Trac bug tracker                        Alexander Strasser, Michael Niedermayer, Carl Eugen Hoyos, Lou Logan
 mailing lists                           Michael Niedermayer, Baptiste Coudurier, Lou Logan
 Google+                                 Paul B Mahol, Michael Niedermayer, Alexander Strasser
-Twitter                                 Lou Logan, Reynaldo H. Verdejo Pinochet
+Twitter                                 Lou Logan
 Launchpad                               Timothy Gu
 
 
@@ -540,6 +539,7 @@ Windows ICL                             Matthew Oliver
 ADI/Blackfin DSP                        Marc Hoffman
 Sparc                                   Roman Shaposhnik
 x86                                     Michael Niedermayer
+OS/2                                    KO Myung-Hun
 
 
 Releases
@@ -547,8 +547,6 @@ Releases
 
 2.6                                     Michael Niedermayer
 2.5                                     Michael Niedermayer
-2.4                                     Michael Niedermayer
-2.2                                     Michael Niedermayer
 
 If you want to maintain an older release, please contact us
 

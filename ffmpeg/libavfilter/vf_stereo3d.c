@@ -63,7 +63,7 @@ enum StereoCode {
 };
 
 typedef struct StereoComponent {
-    int format;                 ///< StereoCode
+    enum StereoCode format;
     int width, height;
     int off_left, off_right;
     int off_lstep, off_rstep;
@@ -256,7 +256,6 @@ static int query_formats(AVFilterContext *ctx)
 {
     Stereo3DContext *s = ctx->priv;
     const enum AVPixelFormat *pix_fmts;
-    AVFilterFormats *fmts_list;
 
     switch (s->out.format) {
     case ANAGLYPH_GM_COLOR:
@@ -279,10 +278,9 @@ static int query_formats(AVFilterContext *ctx)
         pix_fmts = other_pix_fmts;
     }
 
-    fmts_list = ff_make_format_list(pix_fmts);
-    if (!fmts_list)
-        return AVERROR(ENOMEM);
-    return ff_set_common_formats(ctx, fmts_list);
+    ff_set_common_formats(ctx, ff_make_format_list(pix_fmts));
+
+    return 0;
 }
 
 static int config_output(AVFilterLink *outlink)

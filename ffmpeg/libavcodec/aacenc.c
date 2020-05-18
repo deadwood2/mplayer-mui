@@ -388,26 +388,15 @@ static void encode_band_info(AACEncContext *s, SingleChannelElement *sce)
 static void encode_scale_factors(AVCodecContext *avctx, AACEncContext *s,
                                  SingleChannelElement *sce)
 {
-    int diff, off_sf = sce->sf_idx[0], off_pns = sce->sf_idx[0] - NOISE_OFFSET;
-    int noise_flag = 1;
+    int off = sce->sf_idx[0], diff;
     int i, w;
 
     for (w = 0; w < sce->ics.num_windows; w += sce->ics.group_len[w]) {
         for (i = 0; i < sce->ics.max_sfb; i++) {
             if (!sce->zeroes[w*16 + i]) {
-                if (sce->band_type[w*16 + i] == NOISE_BT) {
-                    diff = sce->sf_idx[w*16 + i] - off_pns;
-                    off_pns = sce->sf_idx[w*16 + i];
-                    if (noise_flag-- > 0) {
-                        put_bits(&s->pb, NOISE_PRE_BITS, diff + NOISE_PRE);
-                        continue;
-                    }
-                } else {
-                    diff = sce->sf_idx[w*16 + i] - off_sf;
-                    off_sf = sce->sf_idx[w*16 + i];
-                }
-                diff += SCALE_DIFF_ZERO;
+                diff = sce->sf_idx[w*16 + i] - off + SCALE_DIFF_ZERO;
                 av_assert0(diff >= 0 && diff <= 120);
+                off = sce->sf_idx[w*16 + i];
                 put_bits(&s->pb, ff_aac_scalefactor_bits[diff], ff_aac_scalefactor_code[diff]);
             }
         }
@@ -589,8 +578,16 @@ static int aac_encode_frame(AVCodecContext *avctx, AVPacket *avpkt,
                 ics->group_len[w] = wi[ch].grouping[w];
 
             apply_window_and_mdct(s, &cpe->ch[ch], overlap);
-            if (isnan(cpe->ch->coeffs[0])) {
-                av_log(avctx, AV_LOG_ERROR, "Input contains NaN\n");
+
+            if (isnan(cpe->ch[ch].coeffs[    0]) || isinf(cpe->ch[ch].coeffs[    0]) ||
+                isnan(cpe->ch[ch].coeffs[  128]) || isinf(cpe->ch[ch].coeffs[  128]) ||
+                isnan(cpe->ch[ch].coeffs[2*128]) || isinf(cpe->ch[ch].coeffs[2*128]) ||
+                isnan(cpe->ch[ch].coeffs[3*128]) || isinf(cpe->ch[ch].coeffs[3*128]) ||
+                isnan(cpe->ch[ch].coeffs[4*128]) || isinf(cpe->ch[ch].coeffs[4*128]) ||
+                isnan(cpe->ch[ch].coeffs[5*128]) || isinf(cpe->ch[ch].coeffs[5*128]) ||
+                isnan(cpe->ch[ch].coeffs[6*128]) || isinf(cpe->ch[ch].coeffs[6*128]) ||
+                isnan(cpe->ch[ch].coeffs[7*128]) || isinf(cpe->ch[ch].coeffs[7*128])) {
+                av_log(avctx, AV_LOG_ERROR, "Input contains NaN/+-Inf\n");
                 return AVERROR(EINVAL);
             }
         }
@@ -842,9 +839,6 @@ static const AVOption aacenc_options[] = {
         {"anmr",     "ANMR method",               0, AV_OPT_TYPE_CONST, {.i64 = AAC_CODER_ANMR},    INT_MIN, INT_MAX, AACENC_FLAGS, "aac_coder"},
         {"twoloop",  "Two loop searching method", 0, AV_OPT_TYPE_CONST, {.i64 = AAC_CODER_TWOLOOP}, INT_MIN, INT_MAX, AACENC_FLAGS, "aac_coder"},
         {"fast",     "Constant quantizer",        0, AV_OPT_TYPE_CONST, {.i64 = AAC_CODER_FAST},    INT_MIN, INT_MAX, AACENC_FLAGS, "aac_coder"},
-    {"aac_pns", "Perceptual Noise Substitution", offsetof(AACEncContext, options.pns), AV_OPT_TYPE_INT, {.i64 = 0}, 0, 1, AACENC_FLAGS, "aac_pns"},
-        {"disable",  "Disable PNS", 0, AV_OPT_TYPE_CONST, {.i64 =  0 }, INT_MIN, INT_MAX, AACENC_FLAGS, "aac_pns"},
-        {"enable",   "Enable PNS (Proof of concept)",  0, AV_OPT_TYPE_CONST, {.i64 =  1 }, INT_MIN, INT_MAX, AACENC_FLAGS, "aac_pns"},
     {NULL}
 };
 

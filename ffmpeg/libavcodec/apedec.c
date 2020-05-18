@@ -892,6 +892,9 @@ static void long_filter_high_3800(int32_t *buffer, int order, int shift, int len
     int32_t dotprod, sign;
     int32_t coeffs[256], delay[256];
 
+    if (order >= length)
+        return;
+
     memset(coeffs, 0, order * sizeof(*coeffs));
     for (i = 0; i < order; i++)
         delay[i] = buffer[i];
@@ -1369,7 +1372,7 @@ static void ape_unpack_stereo(APEContext *ctx, int count)
     int32_t *decoded0 = ctx->decoded[0];
     int32_t *decoded1 = ctx->decoded[1];
 
-    if (ctx->frameflags & APE_FRAMECODE_STEREO_SILENCE) {
+    if ((ctx->frameflags & APE_FRAMECODE_STEREO_SILENCE) == APE_FRAMECODE_STEREO_SILENCE) {
         /* We are pure silence, so we're done. */
         av_log(ctx->avctx, AV_LOG_DEBUG, "pure silence stereo\n");
         return;
