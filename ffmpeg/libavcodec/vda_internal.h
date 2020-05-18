@@ -1,8 +1,4 @@
 /*
- * VDA HW acceleration
- *
- * copyright (c) 2011 Sebastien Zwickert
- *
  * This file is part of FFmpeg.
  *
  * FFmpeg is free software; you can redistribute it and/or
@@ -25,18 +21,13 @@
 
 #include "vda.h"
 
-/**
- * \addtogroup VDA_Decoding
- *
- * @{
- */
+void ff_vda_output_callback(void *vda_hw_ctx,
+                            CFDictionaryRef user_info,
+                            OSStatus status,
+                            uint32_t infoFlags,
+                            CVImageBufferRef image_buffer);
 
-/** Send frame data to the hardware decoder. */
-int ff_vda_decoder_decode(struct vda_context *vda_ctx,
-                          uint8_t *bitstream,
-                          int bitstream_size,
-                          int64_t frame_pts);
-
-/* @} */
+int ff_vda_default_init(AVCodecContext *avctx);
+void ff_vda_default_free(AVCodecContext *avctx);
 
 #endif /* AVCODEC_VDA_INTERNAL_H */

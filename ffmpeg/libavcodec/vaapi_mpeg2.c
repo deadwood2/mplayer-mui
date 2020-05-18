@@ -20,8 +20,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "mpegutils.h"
 #include "vaapi_internal.h"
-#include "dsputil.h"
+#include "internal.h"
 
 /** Reconstruct bitstream f_code */
 static inline int mpeg2_get_f_code(MpegEncContext *s)
@@ -44,7 +45,7 @@ static int vaapi_mpeg2_start_frame(AVCodecContext *avctx, av_unused const uint8_
     VAIQMatrixBufferMPEG2 *iq_matrix;
     int i;
 
-    av_dlog(avctx, "vaapi_mpeg2_start_frame()\n");
+    ff_dlog(avctx, "vaapi_mpeg2_start_frame()\n");
 
     vactx->slice_param_size = sizeof(VASliceParameterBufferMPEG2);
 
@@ -73,10 +74,10 @@ static int vaapi_mpeg2_start_frame(AVCodecContext *avctx, av_unused const uint8_
 
     switch (s->pict_type) {
     case AV_PICTURE_TYPE_B:
-        pic_param->backward_reference_picture = ff_vaapi_get_surface_id(&s->next_picture);
+        pic_param->backward_reference_picture = ff_vaapi_get_surface_id(s->next_picture.f);
         // fall-through
     case AV_PICTURE_TYPE_P:
-        pic_param->forward_reference_picture = ff_vaapi_get_surface_id(&s->last_picture);
+        pic_param->forward_reference_picture = ff_vaapi_get_surface_id(s->last_picture.f);
         break;
     }
 
@@ -90,18 +91,13 @@ static int vaapi_mpeg2_start_frame(AVCodecContext *avctx, av_unused const uint8_
     iq_matrix->load_chroma_non_intra_quantiser_matrix   = 1;
 
     for (i = 0; i < 64; i++) {
-        int n = s->dsp.idct_permutation[ff_zigzag_direct[i]];
+        int n = s->idsp.idct_permutation[ff_zigzag_direct[i]];
         iq_matrix->intra_quantiser_matrix[i]            = s->intra_matrix[n];
         iq_matrix->non_intra_quantiser_matrix[i]        = s->inter_matrix[n];
         iq_matrix->chroma_intra_quantiser_matrix[i]     = s->chroma_intra_matrix[n];
         iq_matrix->chroma_non_intra_quantiser_matrix[i] = s->chroma_inter_matrix[n];
     }
     return 0;
-}
-
-static int vaapi_mpeg2_end_frame(AVCodecContext *avctx)
-{
-    return ff_vaapi_common_end_frame(avctx->priv_data);
 }
 
 static int vaapi_mpeg2_decode_slice(AVCodecContext *avctx, const uint8_t *buffer, uint32_t size)
@@ -111,7 +107,7 @@ static int vaapi_mpeg2_decode_slice(AVCodecContext *avctx, const uint8_t *buffer
     GetBitContext gb;
     uint32_t quantiser_scale_code, intra_slice_flag, macroblock_offset;
 
-    av_dlog(avctx, "vaapi_mpeg2_decode_slice(): buffer %p, size %d\n", buffer, size);
+    ff_dlog(avctx, "vaapi_mpeg2_decode_slice(): buffer %p, size %d\n", buffer, size);
 
     /* Determine macroblock_offset */
     init_get_bits(&gb, buffer, 8 * size);
@@ -121,8 +117,8 @@ static int vaapi_mpeg2_decode_slice(AVCodecContext *avctx, const uint8_t *buffer
     intra_slice_flag = get_bits1(&gb);
     if (intra_slice_flag) {
         skip_bits(&gb, 8);
-        while (get_bits1(&gb) != 0)
-            skip_bits(&gb, 8);
+        if (skip_1stop_8data_bits(&gb) < 0)
+            return AVERROR_INVALIDDATA;
     }
     macroblock_offset = get_bits_count(&gb);
 
@@ -132,7 +128,7 @@ static int vaapi_mpeg2_decode_slice(AVCodecContext *avctx, const uint8_t *buffer
         return -1;
     slice_param->macroblock_offset              = macroblock_offset;
     slice_param->slice_horizontal_position      = s->mb_x;
-    slice_param->slice_vertical_position        = s->mb_y;
+    slice_param->slice_vertical_position        = s->mb_y >> (s->picture_structure != PICT_FRAME);
     slice_param->quantiser_scale_code           = quantiser_scale_code;
     slice_param->intra_slice_flag               = intra_slice_flag;
     return 0;
@@ -141,9 +137,9 @@ static int vaapi_mpeg2_decode_slice(AVCodecContext *avctx, const uint8_t *buffer
 AVHWAccel ff_mpeg2_vaapi_hwaccel = {
     .name           = "mpeg2_vaapi",
     .type           = AVMEDIA_TYPE_VIDEO,
-    .id             = CODEC_ID_MPEG2VIDEO,
-    .pix_fmt        = PIX_FMT_VAAPI_VLD,
+    .id             = AV_CODEC_ID_MPEG2VIDEO,
+    .pix_fmt        = AV_PIX_FMT_VAAPI_VLD,
     .start_frame    = vaapi_mpeg2_start_frame,
-    .end_frame      = vaapi_mpeg2_end_frame,
+    .end_frame      = ff_vaapi_mpeg_end_frame,
     .decode_slice   = vaapi_mpeg2_decode_slice,
 };

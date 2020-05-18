@@ -44,14 +44,18 @@
 /* @name window coefficients
  * @{
  */
-DECLARE_ALIGNED(16, extern float,  ff_aac_kbd_long_1024)[1024];
-DECLARE_ALIGNED(16, extern float,  ff_aac_kbd_short_128)[128];
+DECLARE_ALIGNED(32, extern float,  ff_aac_kbd_long_1024)[1024];
+DECLARE_ALIGNED(32, extern float,  ff_aac_kbd_short_128)[128];
+const DECLARE_ALIGNED(32, extern float, ff_aac_eld_window_512)[1920];
+const DECLARE_ALIGNED(32, extern float, ff_aac_eld_window_480)[1800];
 // @}
 
 /* @name number of scalefactor window bands for long and short transform windows respectively
  * @{
  */
 extern const uint8_t ff_aac_num_swb_1024[];
+extern const uint8_t ff_aac_num_swb_512 [];
+extern const uint8_t ff_aac_num_swb_480 [];
 extern const uint8_t ff_aac_num_swb_128 [];
 // @}
 
@@ -69,9 +73,13 @@ extern const float *ff_aac_codebook_vector_vals[];
 extern const uint16_t *ff_aac_codebook_vector_idx[];
 
 extern const uint16_t * const ff_swb_offset_1024[13];
+extern const uint16_t * const ff_swb_offset_512 [13];
+extern const uint16_t * const ff_swb_offset_480 [13];
 extern const uint16_t * const ff_swb_offset_128 [13];
 
 extern const uint8_t ff_tns_max_bands_1024[13];
+extern const uint8_t ff_tns_max_bands_512 [13];
+extern const uint8_t ff_tns_max_bands_480 [13];
 extern const uint8_t ff_tns_max_bands_128 [13];
 
 #endif /* AVCODEC_AACTAB_H */
