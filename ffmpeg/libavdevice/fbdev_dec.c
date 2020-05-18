@@ -27,61 +27,28 @@
  * @see http://linux-fbdev.sourceforge.net/
  */
 
-/* #define DEBUG */
-
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/time.h>
 #include <sys/mman.h>
 #include <time.h>
 #include <linux/fb.h>
 
+#include "libavutil/internal.h"
 #include "libavutil/log.h"
 #include "libavutil/mem.h"
 #include "libavutil/opt.h"
+#include "libavutil/time.h"
 #include "libavutil/parseutils.h"
 #include "libavutil/pixdesc.h"
-#include "avdevice.h"
 #include "libavformat/internal.h"
+#include "avdevice.h"
+#include "fbdev_common.h"
 
-struct rgb_pixfmt_map_entry {
-    int bits_per_pixel;
-    int red_offset, green_offset, blue_offset, alpha_offset;
-    enum PixelFormat pixfmt;
-};
-
-static const struct rgb_pixfmt_map_entry rgb_pixfmt_map[] = {
-    // bpp, red_offset,  green_offset, blue_offset, alpha_offset, pixfmt
-    {  32,       0,           8,          16,           24,   PIX_FMT_RGBA  },
-    {  32,      16,           8,           0,           24,   PIX_FMT_BGRA  },
-    {  32,       8,          16,          24,            0,   PIX_FMT_ARGB  },
-    {  32,       3,           2,           8,            0,   PIX_FMT_ABGR  },
-    {  24,       0,           8,          16,            0,   PIX_FMT_RGB24 },
-    {  24,      16,           8,           0,            0,   PIX_FMT_BGR24 },
-};
-
-static enum PixelFormat get_pixfmt_from_fb_varinfo(struct fb_var_screeninfo *varinfo)
-{
-    int i;
-
-    for (i = 0; i < FF_ARRAY_ELEMS(rgb_pixfmt_map); i++) {
-        const struct rgb_pixfmt_map_entry *entry = &rgb_pixfmt_map[i];
-        if (entry->bits_per_pixel == varinfo->bits_per_pixel &&
-            entry->red_offset     == varinfo->red.offset     &&
-            entry->green_offset   == varinfo->green.offset   &&
-            entry->blue_offset    == varinfo->blue.offset)
-            return entry->pixfmt;
-    }
-
-    return PIX_FMT_NONE;
-}
-
-typedef struct {
+typedef struct FBDevContext {
     AVClass *class;          ///< class for private options
     int frame_size;          ///< size in bytes of a grabbed frame
     AVRational framerate_q;  ///< framerate
-    char *framerate;         ///< framerate string set by a private option
     int64_t time_frame;      ///< time for the next frame to output (in 1/1000000 units)
 
     int fd;                  ///< framebuffer device file descriptor
@@ -95,19 +62,13 @@ typedef struct {
     uint8_t *data;           ///< framebuffer data
 } FBDevContext;
 
-av_cold static int fbdev_read_header(AVFormatContext *avctx,
-                                     AVFormatParameters *ap)
+static av_cold int fbdev_read_header(AVFormatContext *avctx)
 {
     FBDevContext *fbdev = avctx->priv_data;
     AVStream *st = NULL;
-    enum PixelFormat pix_fmt;
+    enum AVPixelFormat pix_fmt;
     int ret, flags = O_RDONLY;
-
-    ret = av_parse_video_rate(&fbdev->framerate_q, fbdev->framerate);
-    if (ret < 0) {
-        av_log(avctx, AV_LOG_ERROR, "Could not parse framerate '%s'.\n", fbdev->framerate);
-        return ret;
-    }
+    const char* device;
 
     if (!(st = avformat_new_stream(avctx, NULL)))
         return AVERROR(ENOMEM);
@@ -117,30 +78,35 @@ av_cold static int fbdev_read_header(AVFormatContext *avctx,
     if (avctx->flags & AVFMT_FLAG_NONBLOCK)
         flags |= O_NONBLOCK;
 
-    if ((fbdev->fd = open(avctx->filename, flags)) == -1) {
+    if (avctx->filename[0])
+        device = avctx->filename;
+    else
+        device = ff_fbdev_default_device();
+
+    if ((fbdev->fd = avpriv_open(device, flags)) == -1) {
         ret = AVERROR(errno);
         av_log(avctx, AV_LOG_ERROR,
                "Could not open framebuffer device '%s': %s\n",
-               avctx->filename, strerror(ret));
+               device, av_err2str(ret));
         return ret;
     }
 
     if (ioctl(fbdev->fd, FBIOGET_VSCREENINFO, &fbdev->varinfo) < 0) {
         ret = AVERROR(errno);
         av_log(avctx, AV_LOG_ERROR,
-               "FBIOGET_VSCREENINFO: %s\n", strerror(errno));
+               "FBIOGET_VSCREENINFO: %s\n", av_err2str(ret));
         goto fail;
     }
 
     if (ioctl(fbdev->fd, FBIOGET_FSCREENINFO, &fbdev->fixinfo) < 0) {
         ret = AVERROR(errno);
         av_log(avctx, AV_LOG_ERROR,
-               "FBIOGET_FSCREENINFO: %s\n", strerror(errno));
+               "FBIOGET_FSCREENINFO: %s\n", av_err2str(ret));
         goto fail;
     }
 
-    pix_fmt = get_pixfmt_from_fb_varinfo(&fbdev->varinfo);
-    if (pix_fmt == PIX_FMT_NONE) {
+    pix_fmt = ff_get_pixfmt_from_fb_varinfo(&fbdev->varinfo);
+    if (pix_fmt == AV_PIX_FMT_NONE) {
         ret = AVERROR(EINVAL);
         av_log(avctx, AV_LOG_ERROR,
                "Framebuffer pixel format not supported.\n");
@@ -156,23 +122,23 @@ av_cold static int fbdev_read_header(AVFormatContext *avctx,
     fbdev->data = mmap(NULL, fbdev->fixinfo.smem_len, PROT_READ, MAP_SHARED, fbdev->fd, 0);
     if (fbdev->data == MAP_FAILED) {
         ret = AVERROR(errno);
-        av_log(avctx, AV_LOG_ERROR, "Error in mmap(): %s\n", strerror(errno));
+        av_log(avctx, AV_LOG_ERROR, "Error in mmap(): %s\n", av_err2str(ret));
         goto fail;
     }
 
     st->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-    st->codec->codec_id   = CODEC_ID_RAWVIDEO;
+    st->codec->codec_id   = AV_CODEC_ID_RAWVIDEO;
     st->codec->width      = fbdev->width;
     st->codec->height     = fbdev->height;
     st->codec->pix_fmt    = pix_fmt;
-    st->codec->time_base  = (AVRational){fbdev->framerate_q.den, fbdev->framerate_q.num};
+    st->codec->time_base  = av_inv_q(fbdev->framerate_q);
     st->codec->bit_rate   =
         fbdev->width * fbdev->height * fbdev->bytes_per_pixel * av_q2d(fbdev->framerate_q) * 8;
 
     av_log(avctx, AV_LOG_INFO,
            "w:%d h:%d bpp:%d pixfmt:%s fps:%d/%d bit_rate:%d\n",
            fbdev->width, fbdev->height, fbdev->varinfo.bits_per_pixel,
-           av_pix_fmt_descriptors[pix_fmt].name,
+           av_get_pix_fmt_name(pix_fmt),
            fbdev->framerate_q.num, fbdev->framerate_q.den,
            st->codec->bit_rate);
     return 0;
@@ -197,7 +163,7 @@ static int fbdev_read_packet(AVFormatContext *avctx, AVPacket *pkt)
     while (1) {
         curtime = av_gettime();
         delay = fbdev->time_frame - curtime;
-        av_dlog(avctx,
+        av_log(avctx, AV_LOG_TRACE,
                 "time_frame:%"PRId64" curtime:%"PRId64" delay:%"PRId64"\n",
                 fbdev->time_frame, curtime, delay);
         if (delay <= 0) {
@@ -215,9 +181,10 @@ static int fbdev_read_packet(AVFormatContext *avctx, AVPacket *pkt)
         return ret;
 
     /* refresh fbdev->varinfo, visible data position may change at each call */
-    if (ioctl(fbdev->fd, FBIOGET_VSCREENINFO, &fbdev->varinfo) < 0)
+    if (ioctl(fbdev->fd, FBIOGET_VSCREENINFO, &fbdev->varinfo) < 0) {
         av_log(avctx, AV_LOG_WARNING,
-               "Error refreshing variable info: %s\n", strerror(errno));
+               "Error refreshing variable info: %s\n", av_err2str(AVERROR(errno)));
+    }
 
     pkt->pts = curtime;
 
@@ -235,20 +202,25 @@ static int fbdev_read_packet(AVFormatContext *avctx, AVPacket *pkt)
     return fbdev->frame_size;
 }
 
-av_cold static int fbdev_read_close(AVFormatContext *avctx)
+static av_cold int fbdev_read_close(AVFormatContext *avctx)
 {
     FBDevContext *fbdev = avctx->priv_data;
 
-    munmap(fbdev->data, fbdev->frame_size);
+    munmap(fbdev->data, fbdev->fixinfo.smem_len);
     close(fbdev->fd);
 
     return 0;
 }
 
+static int fbdev_get_device_list(AVFormatContext *s, AVDeviceInfoList *device_list)
+{
+    return ff_fbdev_get_device_list(device_list);
+}
+
 #define OFFSET(x) offsetof(FBDevContext, x)
 #define DEC AV_OPT_FLAG_DECODING_PARAM
 static const AVOption options[] = {
-    { "framerate","", OFFSET(framerate), AV_OPT_TYPE_STRING, {.str = "25"}, 0, 0, DEC },
+    { "framerate","", OFFSET(framerate_q), AV_OPT_TYPE_VIDEO_RATE, {.str = "25"}, 0, 0, DEC },
     { NULL },
 };
 
@@ -257,6 +229,7 @@ static const AVClass fbdev_class = {
     .item_name  = av_default_item_name,
     .option     = options,
     .version    = LIBAVUTIL_VERSION_INT,
+    .category   = AV_CLASS_CATEGORY_DEVICE_VIDEO_INPUT,
 };
 
 AVInputFormat ff_fbdev_demuxer = {
@@ -266,6 +239,7 @@ AVInputFormat ff_fbdev_demuxer = {
     .read_header    = fbdev_read_header,
     .read_packet    = fbdev_read_packet,
     .read_close     = fbdev_read_close,
+    .get_device_list = fbdev_get_device_list,
     .flags          = AVFMT_NOFILE,
     .priv_class     = &fbdev_class,
 };

@@ -24,9 +24,11 @@
 #include <semaphore.h>
 #include <jack/jack.h>
 
+#include "libavutil/internal.h"
 #include "libavutil/log.h"
 #include "libavutil/fifo.h"
 #include "libavutil/opt.h"
+#include "libavutil/time.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 #include "libavformat/internal.h"
@@ -38,7 +40,7 @@
  */
 #define FIFO_PACKETS_NUM 16
 
-typedef struct {
+typedef struct JackData {
     AVClass        *class;
     jack_client_t * client;
     int             activated;
@@ -92,7 +94,13 @@ static int process_callback(jack_nframes_t nframes, void *arg)
 
     /* Copy and interleave audio data from the JACK buffer into the packet */
     for (i = 0; i < self->nports; i++) {
+    #if HAVE_JACK_PORT_GET_LATENCY_RANGE
+        jack_latency_range_t range;
+        jack_port_get_latency_range(self->ports[i], JackCaptureLatency, &range);
+        latency += range.max;
+    #else
         latency += jack_port_get_total_latency(self->client, self->ports[i]);
+    #endif
         buffer = jack_port_get_buffer(self->ports[i], self->buffer_size);
         for (j = 0; j < self->buffer_size; j++)
             pkt_data[j * self->nports + i] = buffer[j];
@@ -145,7 +153,6 @@ static int start_jack(AVFormatContext *context)
     JackData *self = context->priv_data;
     jack_status_t status;
     int i, test;
-    double o, period;
 
     /* Register as a JACK client, using the context filename as client name. */
     self->client = jack_client_open(context->filename, JackNullOption, &status);
@@ -157,7 +164,9 @@ static int start_jack(AVFormatContext *context)
     sem_init(&self->packet_count, 0, 0);
 
     self->sample_rate = jack_get_sample_rate(self->client);
-    self->ports       = av_malloc(self->nports * sizeof(*self->ports));
+    self->ports       = av_malloc_array(self->nports, sizeof(*self->ports));
+    if (!self->ports)
+        return AVERROR(ENOMEM);
     self->buffer_size = jack_get_buffer_size(self->client);
 
     /* Register JACK ports */
@@ -181,14 +190,16 @@ static int start_jack(AVFormatContext *context)
     jack_set_xrun_callback(self->client, xrun_callback, self);
 
     /* Create time filter */
-    period            = (double) self->buffer_size / self->sample_rate;
-    o                 = 2 * M_PI * 1.5 * period; /// bandwidth: 1.5Hz
-    self->timefilter  = ff_timefilter_new (1.0 / self->sample_rate, sqrt(2 * o), o * o);
+    self->timefilter  = ff_timefilter_new (1.0 / self->sample_rate, self->buffer_size, 1.5);
+    if (!self->timefilter) {
+        jack_client_close(self->client);
+        return AVERROR(ENOMEM);
+    }
 
     /* Create FIFO buffers */
-    self->filled_pkts = av_fifo_alloc(FIFO_PACKETS_NUM * sizeof(AVPacket));
+    self->filled_pkts = av_fifo_alloc_array(FIFO_PACKETS_NUM, sizeof(AVPacket));
     /* New packets FIFO with one extra packet for safety against underruns */
-    self->new_pkts    = av_fifo_alloc((FIFO_PACKETS_NUM + 1) * sizeof(AVPacket));
+    self->new_pkts    = av_fifo_alloc_array((FIFO_PACKETS_NUM + 1), sizeof(AVPacket));
     if ((test = supply_new_packets(self, context))) {
         jack_client_close(self->client);
         return test;
@@ -198,14 +209,14 @@ static int start_jack(AVFormatContext *context)
 
 }
 
-static void free_pkt_fifo(AVFifoBuffer *fifo)
+static void free_pkt_fifo(AVFifoBuffer **fifo)
 {
     AVPacket pkt;
-    while (av_fifo_size(fifo)) {
-        av_fifo_generic_read(fifo, &pkt, sizeof(pkt), NULL);
+    while (av_fifo_size(*fifo)) {
+        av_fifo_generic_read(*fifo, &pkt, sizeof(pkt), NULL);
         av_free_packet(&pkt);
     }
-    av_fifo_free(fifo);
+    av_fifo_freep(fifo);
 }
 
 static void stop_jack(JackData *self)
@@ -216,13 +227,13 @@ static void stop_jack(JackData *self)
         jack_client_close(self->client);
     }
     sem_destroy(&self->packet_count);
-    free_pkt_fifo(self->new_pkts);
-    free_pkt_fifo(self->filled_pkts);
+    free_pkt_fifo(&self->new_pkts);
+    free_pkt_fifo(&self->filled_pkts);
     av_freep(&self->ports);
     ff_timefilter_destroy(self->timefilter);
 }
 
-static int audio_read_header(AVFormatContext *context, AVFormatParameters *params)
+static int audio_read_header(AVFormatContext *context)
 {
     JackData *self = context->priv_data;
     AVStream *stream;
@@ -239,9 +250,9 @@ static int audio_read_header(AVFormatContext *context, AVFormatParameters *param
 
     stream->codec->codec_type   = AVMEDIA_TYPE_AUDIO;
 #if HAVE_BIGENDIAN
-    stream->codec->codec_id     = CODEC_ID_PCM_F32BE;
+    stream->codec->codec_id     = AV_CODEC_ID_PCM_F32BE;
 #else
-    stream->codec->codec_id     = CODEC_ID_PCM_F32LE;
+    stream->codec->codec_id     = AV_CODEC_ID_PCM_F32LE;
 #endif
     stream->codec->sample_rate  = self->sample_rate;
     stream->codec->channels     = self->nports;
@@ -279,8 +290,11 @@ static int audio_read_packet(AVFormatContext *context, AVPacket *pkt)
             av_log(context, AV_LOG_ERROR,
                    "Input error: timed out when waiting for JACK process callback output\n");
         } else {
+            char errbuf[128];
+            int ret = AVERROR(errno);
+            av_strerror(ret, errbuf, sizeof(errbuf));
             av_log(context, AV_LOG_ERROR, "Error while waiting for audio packet: %s\n",
-                   strerror(errno));
+                   errbuf);
         }
         if (!self->client)
             av_log(context, AV_LOG_ERROR, "Input error: JACK server is gone\n");
@@ -316,7 +330,7 @@ static int audio_read_close(AVFormatContext *context)
 
 #define OFFSET(x) offsetof(JackData, x)
 static const AVOption options[] = {
-    { "channels", "Number of audio channels.", OFFSET(nports), AV_OPT_TYPE_INT, { 2 }, 1, INT_MAX, AV_OPT_FLAG_DECODING_PARAM },
+    { "channels", "Number of audio channels.", OFFSET(nports), AV_OPT_TYPE_INT, { .i64 = 2 }, 1, INT_MAX, AV_OPT_FLAG_DECODING_PARAM },
     { NULL },
 };
 
@@ -325,6 +339,7 @@ static const AVClass jack_indev_class = {
     .item_name      = av_default_item_name,
     .option         = options,
     .version        = LIBAVUTIL_VERSION_INT,
+    .category       = AV_CLASS_CATEGORY_DEVICE_AUDIO_INPUT,
 };
 
 AVInputFormat ff_jack_demuxer = {

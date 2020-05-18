@@ -1,6 +1,6 @@
 /*
- * sndio play and grab interface
- * Copyright (c) 2010 Jacob Meuser
+ * Pulseaudio input
+ * Copyright (c) 2011 Luca Barbato <lu_zero@gentoo.org>
  *
  * This file is part of FFmpeg.
  *
@@ -19,30 +19,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef AVDEVICE_SNDIO_COMMON_H
-#define AVDEVICE_SNDIO_COMMON_H
+#ifndef AVDEVICE_PULSE_AUDIO_COMMON_H
+#define AVDEVICE_PULSE_AUDIO_COMMON_H
 
-#include <stdint.h>
-#include <sndio.h>
-
-#include "libavutil/log.h"
+#include <pulse/pulseaudio.h>
+#include "libavcodec/avcodec.h"
 #include "avdevice.h"
 
-typedef struct {
-    AVClass *class;
-    struct sio_hdl *hdl;
-    enum CodecID codec_id;
-    int64_t hwpos;
-    int64_t softpos;
-    uint8_t *buffer;
-    int bps;
-    int buffer_size;
-    int buffer_offset;
-    int channels;
-    int sample_rate;
-} SndioData;
+pa_sample_format_t ff_codec_id_to_pulse_format(enum AVCodecID codec_id);
 
-int ff_sndio_open(AVFormatContext *s1, int is_output, const char *audio_device);
-int ff_sndio_close(SndioData *s);
+int ff_pulse_audio_get_devices(AVDeviceInfoList *devices, const char *server, int output);
 
-#endif /* AVDEVICE_SNDIO_COMMON_H */
+int ff_pulse_audio_connect_context(pa_mainloop **pa_ml, pa_context **pa_ctx,
+                                   const char *server, const char *description);
+
+void ff_pulse_audio_disconnect_context(pa_mainloop **pa_ml, pa_context **pa_ctx);
+
+#endif /* AVDEVICE_PULSE_AUDIO_COMMON_H */
