@@ -64,6 +64,15 @@ export LC_ALL=C
 # Store the configure line that was used
 configuration="$*"
 
+# utility functions
+tolower() {
+  tr '[A-Z]' '[a-z]'
+}
+
+toupper() {
+  tr '[a-z]' '[A-Z]'
+}
+
 # Prefer these macros to full length text !
 # These macros only return an error code - NO display is done
 compile_check() {
@@ -625,7 +634,15 @@ _3dnowext=auto
 _mmxext=auto
 _sse=auto
 _sse2=auto
+_sse3=auto
 _ssse3=auto
+_sse4_1=auto
+_sse4_2=auto
+_avx=auto
+_avx2=auto
+_xop=auto
+_fma3=auto
+_fma4=auto
 _cmov=auto
 _fast_cmov=auto
 _fast_clz=auto
@@ -634,6 +651,7 @@ _armv6=auto
 _armv6t2=auto
 _armvfp=auto
 vfpv3=auto
+setend=auto
 neon=auto
 armthumb=auto
 _iwmmxt=auto
@@ -1865,14 +1883,22 @@ EOF
     return 0
   }
 
-  extcheck $_mmx      "mmx"      "emms"
-  extcheck $_mmxext   "mmxext"   "sfence"
-  extcheck $_3dnow    "3dnow"    "femms"
-  extcheck $_3dnowext "3dnowext" "pswapd %%mm0, %%mm0"
-  extcheck $_sse      "sse"      "xorps %%xmm0, %%xmm0" || _gcc3_ext="$_gcc3_ext -mno-sse"
-  extcheck $_sse2     "sse2"     "xorpd %%xmm0, %%xmm0" || _gcc3_ext="$_gcc3_ext -mno-sse2"
-  extcheck $_ssse3    "ssse3"    "pabsd %%xmm0, %%xmm0"
-  extcheck $_cmov     "cmov"     "cmovb %%eax,  %%ebx"
+  extcheck $_mmx      'mmx'      'emms'
+  extcheck $_mmxext   'mmxext'   'sfence'
+  extcheck $_3dnow    '3dnow'    'femms'
+  extcheck $_3dnowext '3dnowext' 'pswapd %%mm0, %%mm0'
+  extcheck $_sse      'sse'      'xorps %%xmm0, %%xmm0' || _gcc3_ext="$_gcc3_ext -mno-sse"
+  extcheck $_sse2     'sse2'     'xorpd %%xmm0, %%xmm0' || _gcc3_ext="$_gcc3_ext -mno-sse2"
+  extcheck $_sse3     'sse3'     'addsubps %%xmm0, %%xmm0'
+  extcheck $_ssse3    'ssse3'    'pabsd %%xmm0, %%xmm0'
+  extcheck $_sse4_1   'sse4_1'   'pmaxsb %%xmm0, %%xmm0'
+  extcheck $_sse4_2   'sse4_2'   'pcmpgtq %%xmm0, %%xmm0'
+  extcheck $_avx      'avx'      'vpabsw %%xmm0, %%xmm0'
+  extcheck $_avx2     'avx2'     'vextracti128 $0, %%ymm0, %%xmm0'
+  extcheck $_xop      'xop'      'vpmacsdd %%xmm0, %%xmm1, %%xmm2, %%xmm3'
+  extcheck $_fma3     'fma3'     'vfmadd132ps %%ymm0, %%ymm1, %%ymm2'
+  extcheck $_fma4     'fma4'     'vfmaddps %%ymm0, %%ymm1, %%ymm2, %%ymm3'
+  extcheck $_cmov     'cmov'     'cmovb %%eax,  %%ebx'
 
   echocheck "mtrr support"
   if test "$_mtrr" = kernel_check ; then
@@ -1896,7 +1922,7 @@ def_fast_unaligned='#define HAVE_FAST_UNALIGNED 0'
 def_av_fast_unaligned='#define AV_HAVE_FAST_UNALIGNED 0'
 def_local_aligned_8='#define HAVE_LOCAL_ALIGNED_8 0'
 def_local_aligned_16='#define HAVE_LOCAL_ALIGNED_16 0'
-arch_all='X86 IA64 SPARC ARM AVR32 SH4 PPC ALPHA MIPS PA_RISC S390 S390X VAX BFIN XTENSA TOMI GENERIC'
+arch_all='X86 IA64 SPARC ARM AVR32 SH4 PPC ALPHA MIPS PA_RISC S390 S390X VAX BFIN XTENSA TOMI GENERIC AARCH64'
 subarch_all='X86_32 X86_64 PPC64'
 case "$host_arch" in
   i[3-9]86|x86|x86pc|k5|k6|k6-2|k6-3|pentium*|athlon*|i586-i686)
@@ -2176,7 +2202,17 @@ case "$host_arch" in
         ;;
       GenuineIntel)
         case "$pfamily" in
-        6) proc=core2;;
+        6)
+          if test "$pmodel" -eq 28 -o "$pmodel" -eq 38 -o "$pmodel" -eq 54; then
+            proc=atom
+          elif test "$pmodel" -ge 42; then
+            proc=corei7-avx
+          elif test "$pmodel" -ge 26; then
+            proc=corei7
+          else
+            proc=core2
+          fi
+          ;;
         *)
           # 64-bit prescotts exist, but as far as GCC is concerned they
           # have the same capabilities as a nocona.
@@ -2211,6 +2247,9 @@ case "$host_arch" in
         cflag_check -march=$proc $cpuopt=$proc || proc=error
       fi
       # --- Intel processors ---
+      if test "$proc" = "atom" || test "$proc" = "corei7-avx" || test "$proc" = "corei7"; then
+        cflag_check -march=$proc $cpuopt=$proc || proc=core2
+      fi
       if test "$proc" = "core2"; then
         cflag_check -march=$proc $cpuopt=$proc || proc=x86-64
       fi
@@ -2523,7 +2562,15 @@ if test "$_runtime_cpudetection" = yes ; then
     test "$_mmxext"   != no && _mmxext=yes
     test "$_sse"      != no && _sse=yes
     test "$_sse2"     != no && _sse2=yes
+    test "$_sse3"     != no && _sse3=yes
     test "$_ssse3"    != no && _ssse3=yes
+    test "$_sse4_1"   != no && _sse4_1=yes
+    test "$_sse4_2"   != no && _sse4_2=yes
+    test "$_avx"      != no && _avx=yes
+    test "$_avx2"     != no && _avx2=yes
+    test "$_xop"      != no && _xop=yes
+    test "$_fma3"     != no && _fma3=yes
+    test "$_fma4"     != no && _fma4=yes
     test "$_mtrr"     != no && _mtrr=yes
   fi
   if ppc; then
@@ -2604,8 +2651,8 @@ fi # if darwin && test "$cc_vendor" = "gnu" ; then
 # Checking for CFLAGS
 _install_strip="-s"
 if test "$_profile" != "" || test "$_debug" != "" ; then
-  CFLAGS="-O1 $_march $_mcpu $_pipe $_debug $_profile"
-  WARNFLAGS="-W -Wall"
+  CFLAGS="-O0 $_march $_mcpu $_pipe $_debug $_profile"
+  WARNFLAGS="-W -Wall -Wno-sign-compare -Wno-switch -Wno-parentheses -Wpointer-arith -Wno-unused-parameter"
   _install_strip=
 elif test -z "$CFLAGS" ; then
   if test "$cc_vendor" = "intel" ; then
@@ -2619,7 +2666,7 @@ elif test -z "$CFLAGS" ; then
     CFLAGS="-O2 $_march $_mcpu $_pipe"
   else
     CFLAGS="-O4 $_march $_mcpu $_pipe -ffast-math -fomit-frame-pointer"
-    WARNFLAGS="-Wall -Wno-switch -Wno-parentheses -Wpointer-arith"
+    WARNFLAGS="-Wall -Wno-sign-compare -Wno-switch -Wno-parentheses -Wpointer-arith -Wno-unused-parameter"
     WARN_CFLAGS="-Werror-implicit-function-declaration"
     extra_ldflags="$extra_ldflags -ffast-math"
   fi
@@ -2787,6 +2834,7 @@ else
 fi
 
 echo "pextrd [eax], xmm0, 1" > $TMPS
+yasm_features_all="cpunop"
 if test "$_yasm" ; then
   if ! yasm_check ; then
     if x86_64 ; then
@@ -2796,7 +2844,9 @@ if test "$_yasm" ; then
       esac
     fi
     YASMFLAGS="-f $objformat $yasmdefines"
-    yasm_check || die "yasm not found, use --yasm='' if you really want to compile without"
+    yasm_check || ! x86 || die "yasm not found, use --yasm='' if you really want to compile without"
+    echo "CPU amdnop" > $TMPS
+    yasm_check && yasm_features="cpunop"
   fi
 fi
 if test $_yasm ; then
@@ -2970,23 +3020,33 @@ if arm ; then
   echores "$_iwmmxt"
 fi
 
-cpuexts_all='ALTIVEC AVX MMX MMX2 AMD3DNOW AMD3DNOWEXT SSE SSE2 SSSE3 FAST_CMOV CMOV FAST_CLZ ARMV5TE ARMV6 ARMV6T2 ARMVFP VFPV3 NEON IWMMXT MMI VIS MVI'
+cpuexts_all='ALTIVEC XOP AVX AVX2 FMA3 FMA4 MMX MMX2 MMXEXT AMD3DNOW AMD3DNOWEXT SSE SSE2 SSE3 SSSE3 SSE4 SSE42 FAST_CMOV I686 FAST_CLZ ARMV5TE ARMV6 ARMV6T2 VFP VFPV3 SETEND NEON IWMMXT MMI VIS MVI'
 test "$_altivec"   = yes && cpuexts="ALTIVEC $cpuexts"
 test "$_mmx"       = yes && cpuexts="MMX $cpuexts"
 test "$_mmxext"    = yes && cpuexts="MMX2 $cpuexts"
+test "$_mmxext"    = yes && cpuexts="MMXEXT $cpuexts"
 test "$_3dnow"     = yes && cpuexts="AMD3DNOW $cpuexts"
 test "$_3dnowext"  = yes && cpuexts="AMD3DNOWEXT $cpuexts"
 test "$_sse"       = yes && cpuexts="SSE $cpuexts"
 test "$_sse2"      = yes && cpuexts="SSE2 $cpuexts"
+test "$_sse3"      = yes && cpuexts="SSE3 $cpuexts"
 test "$_ssse3"     = yes && cpuexts="SSSE3 $cpuexts"
-test "$_cmov"      = yes && cpuexts="CMOV $cpuexts"
+test "$_sse4_1"    = yes && cpuexts="SSE4 $cpuexts"
+test "$_sse4_2"    = yes && cpuexts="SSE42 $cpuexts"
+test "$_avx"       = yes && cpuexts="AVX $cpuexts"
+test "$_avx2"      = yes && cpuexts="AVX2 $cpuexts"
+test "$_xop"       = yes && cpuexts="XOP $cpuexts"
+test "$_fma3"      = yes && cpuexts="FMA3 $cpuexts"
+test "$_fma4"      = yes && cpuexts="FMA4 $cpuexts"
+test "$_cmov"      = yes && cpuexts="I686 $cpuexts"
 test "$_fast_cmov" = yes && cpuexts="FAST_CMOV $cpuexts"
 test "$_fast_clz"  = yes && cpuexts="FAST_CLZ $cpuexts"
 test "$_armv5te"   = yes && cpuexts="ARMV5TE $cpuexts"
 test "$_armv6"     = yes && cpuexts="ARMV6 $cpuexts"
 test "$_armv6t2"   = yes && cpuexts="ARMV6T2 $cpuexts"
-test "$_armvfp"    = yes && cpuexts="ARMVFP $cpuexts"
+test "$_armvfp"    = yes && cpuexts="VFP $cpuexts"
 test "$vfpv3"      = yes && cpuexts="VFPV3 $cpuexts"
+test "$setend"     = yes && cpuexts="SETEND $cpuexts"
 test "$neon"       = yes && cpuexts="NEON $cpuexts"
 test "$_iwmmxt"    = yes && cpuexts="IWMMXT $cpuexts"
 test "$_vis"       = yes && cpuexts="VIS $cpuexts"
@@ -3144,7 +3204,7 @@ fi
 echores "$_kstat"
 
 
-for func in cbrtf exp2 exp2f llrint llrintf log2 log2f lrint lrintf round roundf trunc truncf; do
+for func in cbrt cbrtf exp2 exp2f isnan isinf llrint llrintf log2 log2f lrint lrintf rint round roundf trunc truncf; do
 echocheck $func
 eval _$func=no
 statement_check math.h "${func}(2.0)" -D_ISOC99_SOURCE && eval _$func=yes
@@ -3168,6 +3228,25 @@ else
 fi
 echores "$_mkstemp"
 
+echocheck "gmtime_r"
+_gmtime_r=no
+statement_check time.h 'gmtime_r(0, 0)' && _gmtime_r=yes
+if test "$_gmtime_r" = yes ; then
+  def_gmtime_r='#define HAVE_GMTIME_R 1'
+else
+  def_gmtime_r='#undef HAVE_GMTIME_R'
+fi
+echores "$_gmtime_r"
+
+echocheck "localtime_r"
+_localtime_r=no
+statement_check time.h 'localtime_r(0, 0)' && _localtime_r=yes
+if test "$_localtime_r" = yes ; then
+  def_localtime_r='#define HAVE_LOCALTIME_R 1'
+else
+  def_localtime_r='#undef HAVE_LOCALTIME_R'
+fi
+echores "$_localtime_r"
 
 echocheck "nanosleep"
 _nanosleep=no
@@ -3689,6 +3768,12 @@ test "$_os2threads" = yes && def_threads='#define HAVE_THREADS 1' && def_os2thre
 echores "$_os2threads"
 fi #if os2
 
+if test "$_os2threads" = yes || test "$_w32threads" = yes || test "$_pthreads" = yes ; then
+    _threads=yes
+else
+    _threads=no
+fi
+
 echocheck "rpath"
 if test "$_rpath" = yes ; then
   for I in $(echo $extra_ldflags | sed 's/-L//g') ; do
@@ -4105,9 +4190,12 @@ if test "$_smb" = yes; then
 fi
 if test "$_smb" = auto; then
   _smb=no
+  pkg_inc=$($_pkg_config --cflags smbclient 2>/dev/null)
   for ld_tmp in "-lsmbclient" "-lsmbclient $ld_dl" "-lsmbclient $ld_dl -lnsl" "-lsmbclient $ld_dl -lssl -lnsl" ; do
     statement_check libsmbclient.h 'smbc_opendir("smb://")' $ld_tmp &&
       extra_ldflags="$extra_ldflags $ld_tmp" && _smb=yes && break
+    statement_check libsmbclient.h 'smbc_opendir("smb://")' $ld_tmp $pkg_inc &&
+      extra_ldflags="$extra_ldflags $ld_tmp" && extra_cflags="$extra_cflags $pkg_inc" && _smb=yes && break
   done
 fi
 
@@ -8146,6 +8234,8 @@ MANDIR  = \$(DESTDIR)$_mandir
 CONFDIR = \$(DESTDIR)$_confdir
 
 AR      = $_ar
+ARFLAGS = rc
+AR_O    = \$@
 AS      = $_cc
 CC      = $_cc
 CXX     = $_cc
@@ -8382,11 +8472,16 @@ HOSTCFLAGS = -D_ISOC99_SOURCE -D_POSIX_C_SOURCE=200112 -O3
 HOSTLIBS   = -lm
 AS_O       = -o \$@
 CC_O       = -o \$@
+CXX_O      = -o \$@
+AS_C       = -c
+CC_C       = -c
+CXX_C      = -c
 LD         = gcc
 RANLIB     = $_ranlib
 YASM       = $_yasm
-YASMDEP    = $_yasm
+DEPYASM    = $_yasm
 YASMFLAGS  = $YASMFLAGS
+STRIP      = strip
 
 CONFIG_STATIC = yes
 SRC_PATH      = .
@@ -8401,22 +8496,62 @@ SLIBNAME            = \$(SLIBPREF)\$(FULLNAME)\$(SLIBSUF)
 SLIBNAME_WITH_MAJOR = \$(SLIBNAME)-42
 
 # Some FFmpeg codecs depend on these. Enable them unconditionally for now.
-CONFIG_AANDCT  = yes
+CONFIG_AANDCTTABLES  = yes
+CONFIG_AUDIODSP = yes
+CONFIG_AUDIO_FRAME_QUEUE = yes
+CONFIG_BLOCKDSP= yes
+CONFIG_BSWAPDSP= yes
+CONFIG_CABAC   = yes
 CONFIG_DCT     = yes
 CONFIG_DWT     = yes
+CONFIG_ERROR_RESILIENCE = yes
+CONFIG_EXIF    = yes
+CONFIG_FAANDCT = yes
+CONFIG_FAANIDCT= yes
+CONFIG_FDCTDSP = yes
+CONFIG_FMTCONVERT = yes
+CONFIG_FRAME_THREAD_ENCODER = yes
 CONFIG_FFT     = yes
 CONFIG_GOLOMB  = yes
+CONFIG_H263DSP = yes
 CONFIG_H264CHROMA = yes
 CONFIG_H264DSP = yes
 CONFIG_H264PRED= yes
 CONFIG_H264QPEL= yes
+CONFIG_HPELDSP = yes
+CONFIG_IIRFILTER = yes
+CONFIG_JPEGTABLES = yes
+CONFIG_QPELDSP = yes
+CONFIG_QSV     = no
+CONFIG_HUFFYUVDSP = yes
+CONFIG_HUFFYUVENCDSP = yes
+CONFIG_IDCTDSP = yes
+CONFIG_TPELDSP = yes
 CONFIG_HUFFMAN = yes
+CONFIG_IMDCT15 = yes
+CONFIG_INTRAX8 = yes
+CONFIG_LLAUDDSP= yes
+CONFIG_LLVIDDSP= yes
 CONFIG_LPC     = yes
 CONFIG_LSP     = yes
+CONFIG_LZO     = yes
 CONFIG_MDCT    = yes
+CONFIG_ME_CMP  = yes
+CONFIG_MPEG_ER = yes
 CONFIG_MPEGAUDIODSP = yes
+CONFIG_MPEGVIDEO    = yes
+CONFIG_MPEGVIDEOENC = yes
+CONFIG_PIXBLOCKDSP  = yes
+CONFIG_RANGECODER   = yes
 CONFIG_RDFT    = yes
+CONFIG_RIFFDEC = yes
+CONFIG_RIFFENC = yes
+CONFIG_RTPENC_CHAIN = yes
 CONFIG_SINEWIN = yes
+CONFIG_STARTCODE = yes
+CONFIG_VIDEODSP = yes
+CONFIG_VP3DSP  = yes
+CONFIG_WMA_FREQS = yes
 
 $mak_hardcoded_tables
 $mak_libavcodec_mpegaudio_hp
@@ -8429,6 +8564,7 @@ CONFIG_CRYSTALHD= $crystalhd
 CONFIG_ENCODERS = yes
 CONFIG_GPL      = yes
 CONFIG_MLIB     = $_mlib
+CONFIG_MPEGAUDIO=yes
 CONFIG_MUXERS   = yes
 CONFIG_NETWORK  = $networking
 CONFIG_RTPDEC   = $networking
@@ -8442,7 +8578,9 @@ HAVE_OS2THREADS = $_os2threads
 HAVE_PTHREADS   = $_pthreads
 HAVE_SHM        = $_shm
 HAVE_W32THREADS = $_w32threads
+HAVE_THREADS    = $_threads
 HAVE_YASM       = $have_yasm
+INTRINSICS      = none
 
 $(echo $libavdecoders  | tr '[a-z] ' '[A-Z]\n' | sed 's/^/CONFIG_/;s/$/=yes/')
 $(echo $libavencoders  | tr '[a-z] ' '[A-Z]\n' | sed 's/^/CONFIG_/;s/$/=yes/')
@@ -8458,16 +8596,17 @@ EOF
 #############################################################################
 
 ff_config_enable () {
-list=$(echo $1 | tr '[a-z]' '[A-Z]')
-item=$(echo $2 | tr '[a-z]' '[A-Z]')
+list=$(echo $1 | toupper)
+item=$(echo $2 | toupper)
 _nprefix=$4;
 _defineprefix=$3;
+_postfix=$5;
 test -z "$_nprefix" && _nprefix='CONFIG'
 for part in $list; do
   if $(echo $item | grep -q -E "(^| )$part($| )"); then
-    echo "${_defineprefix}define ${_nprefix}_$part 1"
+    echo "${_defineprefix}define ${_nprefix}_${part}${_postfix} 1"
   else
-    echo "${_defineprefix}define ${_nprefix}_$part 0"
+    echo "${_defineprefix}define ${_nprefix}_${part}${_postfix} 0"
   fi
 done
 }
@@ -8552,7 +8691,9 @@ $def_winsock2_h
 $def_gethostbyname2
 $def_gettimeofday
 $def_glob
+$def_gmtime_r
 $def_langinfo
+$def_localtime_r
 $def_map_memalign
 $def_memalign
 $def_nanosleep
@@ -8613,6 +8754,8 @@ $def_words_endian
 $(ff_config_enable "$arch_all" "$arch" "#" "ARCH")
 $(ff_config_enable "$subarch_all" "$subarch" "#" "ARCH")
 $(ff_config_enable "$cpuexts_all" "$cpuexts" "#" "HAVE")
+$(ff_config_enable "$cpuexts_all" "$cpuexts" "#" "HAVE" "_EXTERNAL")
+$(ff_config_enable "$cpuexts_all" "$cpuexts" "#" "HAVE" "_INLINE")
 
 
 /* Blu-ray/DVD/VCD/CD */
@@ -8840,6 +8983,8 @@ $def_zr
 
 
 /* FFmpeg */
+#define av_restrict restrict
+
 $def_ffmpeg
 $def_ffmpeg_a
 $def_ffmpeg_so
@@ -8854,6 +8999,7 @@ $def_arpa_inet_h
 $def_bswap
 $def_bzlib
 $def_dcbzl
+$def_cbrt
 $def_cbrtf
 $def_exp2
 $def_exp2f
@@ -8863,6 +9009,9 @@ $def_gnu_as
 $def_hardcoded_tables
 $def_ibm_asm
 $def_libavcodec_mpegaudio_hp
+$def_isinf
+$def_isnan
+$def_ldexpf
 $def_llrint
 $def_llrintf
 $def_local_aligned_8
@@ -8880,6 +9029,7 @@ $def_pic
 $def_poll_h
 $def_posix_memalign
 $def_pthreads
+$def_rint
 $def_round
 $def_roundf
 $def_threads
@@ -8896,11 +9046,13 @@ $def_yasm
 #define CONFIG_AVSERVER 0
 #define CONFIG_FASTDIV 0
 #define CONFIG_FFSERVER 0
+#define CONFIG_FTRAPV 0
 #define CONFIG_GNUTLS 0
 #define CONFIG_GPL 1
 #define CONFIG_GRAY 0
 #define CONFIG_LIBMODPLUG 0
 #define CONFIG_LIBVORBIS 0
+#define CONFIG_MEMORY_POISONING 0
 #define CONFIG_OPENSSL 0
 #define CONFIG_POWERPC_PERF 0
 /* For now prefer speed over avoiding potential invalid reads */
@@ -8908,16 +9060,23 @@ $def_yasm
 #define CONFIG_SHARED 0
 #define CONFIG_SMALL 0
 #define CONFIG_SWSCALE_ALPHA 1
+#define SWS_MAX_FILTER_SIZE 256
+#define CONFIG_QSV 0
+#define CONFIG_VAAPI 0
 
 #define HAVE_ALIGNED_STACK 1
 #define HAVE_ATTRIBUTE_PACKED 1
-#define HAVE_AVX 0
 #define HAVE_GETHRTIME 0
 #define HAVE_INLINE_ASM 1
+#define HAVE_INLINE_ASM_NONLOCAL_LABELS 1
+#define HAVE_INLINE_ASM_DIRECT_SYMBOL_REFS 1
+#define HAVE_INTRINSICS_NEON 0
 #define HAVE_ISATTY 0
 #define HAVE_LDBRX 0
-#define HAVE_LOCALTIME_R 0
 #define HAVE_MAPVIEWOFFILE 0
+#define HAVE_MIPSDSPR1 0
+#define HAVE_MIPSFPU 0
+#define HAVE_MM_EMPTY 0
 #define HAVE_PPC4XX 0
 #define HAVE_STRERROR_R 0
 #define HAVE_STRPTIME 0
@@ -8927,19 +9086,43 @@ $def_yasm
 #define HAVE_VIRTUALALLOC 0
 
 /* Some FFmpeg codecs depend on these. Enable them unconditionally for now. */
-#define CONFIG_AANDCT 1
+#define CONFIG_AANDCTTABLES 1
+#define CONFIG_AUDIODSP 1
+#define CONFIG_AUDIO_FRAME_QUEUE 1
+#define CONFIG_BLOCKDSP 1
+#define CONFIG_BSWAPDSP 1
 #define CONFIG_DCT 1
+#define CONFIG_DVPROFILE 1
 #define CONFIG_DWT 1
+#define CONFIG_ERROR_RESILIENCE 1
+#define CONFIG_EXIF 1
+#define CONFIG_FAANDCT 1
+#define CONFIG_FAANIDCT 1
+#define CONFIG_FDCTDSP 1
+#define CONFIG_FMTCONVERT 1
+#define CONFIG_FRAME_THREAD_ENCODER 1
 #define CONFIG_FFT 1
 #define CONFIG_GOLOMB 1
+#define CONFIG_H263DSP 1
 #define CONFIG_H264CHROMA 1
 #define CONFIG_H264DSP 1
 #define CONFIG_H264PRED 1
 #define CONFIG_H264QPEL 1
 #define CONFIG_HUFFMAN 1
+#define CONFIG_IDCTDSP 1
 #define CONFIG_LPC 1
+#define CONFIG_LZO 1
 #define CONFIG_MDCT 1
+#define CONFIG_ME_CMP 1
+#define CONFIG_MPEG_ER 1
+#define CONFIG_MPEGVIDEO 1
+#define CONFIG_PIXBLOCKDSP 1
 #define CONFIG_RDFT 1
+#define CONFIG_RIFFDEC 1
+#define CONFIG_RIFFENC 1
+#define CONFIG_STARTCODE 1
+#define CONFIG_VIDEODSP 1
+#define CONFIG_WMA_FREQS 1
 
 /* Use these registers in FFmpeg x86 inline asm. No proper detection yet. */
 #ifndef MP_DEBUG
@@ -9001,12 +9184,16 @@ cmp -s "$TMPH" ffmpeg/libavutil/avconfig.h || mv -f "$TMPH" ffmpeg/libavutil/avc
 
 
 if x86; then
-# Create a skeleton config.asm with just the ARCH_ definitions for FFmpeg.
+# Create a skeleton config.asm with just the ARCH_ and *CODER definitions for FFmpeg.
 > "$TMPS"
 echo "%define CONFIG_GPL 1" >> "$TMPS"
+echo "%define HAVE_ALIGNED_STACK 1" >> "$TMPS"
 echo "$(ff_config_enable "$arch_all" "$arch" "%" "ARCH")" >> "$TMPS"
 echo "$(ff_config_enable "$subarch_all" "$subarch" "%" "ARCH")" >> "$TMPS"
-echo "$(ff_config_enable "$cpuexts_all" "$cpuexts" "%" "HAVE")" >> "$TMPS"
+echo "$(ff_config_enable "$cpuexts_all" "$cpuexts" "%" "HAVE" "_EXTERNAL")" >> "$TMPS"
+echo "$(ff_config_enable "$yasm_features_all" "$yasm_features" "%" "HAVE")" >> "$TMPS"
+echo "$(ff_config_enable "$libavdecoders_all"  "$libavdecoders" "%" "CONFIG")" >> "$TMPS"
+echo "$(ff_config_enable "$libavencoders_all"  "$libavencoders" "%" "CONFIG")" >> "$TMPS"
 
 cmp -s "$TMPS" ffmpeg/config.asm || mv -f "$TMPS" ffmpeg/config.asm
 fi

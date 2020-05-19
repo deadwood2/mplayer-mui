@@ -23,6 +23,7 @@
 #include "ad_internal.h"
 #include "av_helpers.h"
 #include "libavformat/avformat.h"
+#include "libavformat/internal.h"
 #include "libavcodec/avcodec.h"
 #include "libavutil/opt.h"
 
@@ -82,14 +83,14 @@ static int init(sh_audio_t *sh)
     unsigned char *start;
     double pts;
     static const struct {
-        const char *name; enum CodecID id;
+        const char *name; enum AVCodecID id;
     } fmt_id_type[] = {
-        { "aac" , CODEC_ID_AAC    },
-        { "ac3" , CODEC_ID_AC3    },
-        { "dca" , CODEC_ID_DTS    },
-        { "eac3", CODEC_ID_EAC3   },
-        { "mpa" , CODEC_ID_MP3    },
-        { "thd" , CODEC_ID_TRUEHD },
+        { "aac" , AV_CODEC_ID_AAC    },
+        { "ac3" , AV_CODEC_ID_AC3    },
+        { "dca" , AV_CODEC_ID_DTS    },
+        { "eac3", AV_CODEC_ID_EAC3   },
+        { "mpa" , AV_CODEC_ID_MP3    },
+        { "thd" , AV_CODEC_ID_TRUEHD },
         { NULL  , 0 }
     };
     AVFormatContext     *lavf_ctx  = NULL;
@@ -129,7 +130,7 @@ static int init(sh_audio_t *sh)
             break;
         }
     }
-    lavf_ctx->raw_packet_buffer_remaining_size = RAW_PACKET_BUFFER_SIZE;
+    lavf_ctx->internal->raw_packet_buffer_remaining_size = RAW_PACKET_BUFFER_SIZE;
     if (AVERROR_PATCHWELCOME == lavf_ctx->oformat->write_header(lavf_ctx)) {
         mp_msg(MSGT_DECAUDIO,MSGL_INFO,
                "This codec is not supported by spdifenc.\n");
@@ -137,7 +138,6 @@ static int init(sh_audio_t *sh)
     }
 
     // get sample_rate & bitrate from parser
-    bps = srate = 0;
     x = ds_get_packet_pts(sh->ds, &start, &pts);
     in_size = x;
     if (x <= 0) {
@@ -145,10 +145,9 @@ static int init(sh_audio_t *sh)
         x = 0;
     }
     ds_parse(sh->ds, &start, &x, pts, 0);
-    if (x == 0) { // not enough buffer
-        srate = 48000;    //fake value
-        bps   = 768000/8; //fake value
-    } else  if (sh->avctx) {
+    srate = 48000;    //fake value
+    bps   = 768000/8; //fake value
+    if (x && sh->avctx) { // we have parser and large enough buffer
         if (sh->avctx->sample_rate < 44100) {
             mp_msg(MSGT_DECAUDIO,MSGL_INFO,
                    "This stream sample_rate[%d Hz] may be broken. "
@@ -162,21 +161,21 @@ static int init(sh_audio_t *sh)
     sh->ds->buffer_pos -= in_size;
 
     switch (lavf_ctx->streams[0]->codec->codec_id) {
-    case CODEC_ID_AAC:
+    case AV_CODEC_ID_AAC:
         spdif_ctx->iec61937_packet_size = 16384;
         sh->sample_format               = AF_FORMAT_IEC61937_LE;
         sh->samplerate                  = srate;
         sh->channels                    = 2;
         sh->i_bps                       = bps;
         break;
-    case CODEC_ID_AC3:
+    case AV_CODEC_ID_AC3:
         spdif_ctx->iec61937_packet_size = 6144;
-        sh->sample_format               = AF_FORMAT_IEC61937_LE;
+        sh->sample_format               = AF_FORMAT_AC3_LE;
         sh->samplerate                  = srate;
         sh->channels                    = 2;
         sh->i_bps                       = bps;
         break;
-    case CODEC_ID_DTS: // FORCE USE DTS-HD
+    case AV_CODEC_ID_DTS: // FORCE USE DTS-HD
         opt = av_opt_find(&lavf_ctx->oformat->priv_class,
                           "dtshd_rate", NULL, 0, 0);
         if (!opt)
@@ -190,21 +189,21 @@ static int init(sh_audio_t *sh)
         sh->channels                    = 2*4;
         sh->i_bps                       = bps;
         break;
-    case CODEC_ID_EAC3:
+    case AV_CODEC_ID_EAC3:
         spdif_ctx->iec61937_packet_size = 24576;
         sh->sample_format               = AF_FORMAT_IEC61937_LE;
         sh->samplerate                  = 192000;
         sh->channels                    = 2;
         sh->i_bps                       = bps;
         break;
-    case CODEC_ID_MP3:
+    case AV_CODEC_ID_MP3:
         spdif_ctx->iec61937_packet_size = 4608;
         sh->sample_format               = AF_FORMAT_MPEG2;
         sh->samplerate                  = srate;
         sh->channels                    = 2;
         sh->i_bps                       = bps;
         break;
-    case CODEC_ID_TRUEHD:
+    case AV_CODEC_ID_TRUEHD:
         spdif_ctx->iec61937_packet_size = 61440;
         sh->sample_format               = AF_FORMAT_IEC61937_LE;
         sh->samplerate                  = 192000;
@@ -252,7 +251,7 @@ static int decode_audio(sh_audio_t *sh, unsigned char *buf,
             if (x == 0) {
                 mp_msg(MSGT_DECAUDIO,MSGL_V,
                        "start[%p] pkt.size[%d] in_size[%d] consumed[%d] x[%d].\n",
-                       start, pkt.size, in_size, consumed, x);
+                       start, 0, in_size, consumed, x);
                 continue; // END_NOT_FOUND
             }
             sh->ds->buffer_pos -= in_size - consumed;
@@ -267,7 +266,7 @@ static int decode_audio(sh_audio_t *sh, unsigned char *buf,
             sh->pts       = pts;
             sh->pts_bytes = 0;
         }
-        ret = lavf_ctx->oformat->write_packet(lavf_ctx, &pkt);
+        ret = av_write_frame(lavf_ctx, &pkt);
         if (ret < 0)
             break;
     }

@@ -37,10 +37,13 @@
 #include "mp_msg.h"
 #include "cpudetect.h"
 
+#include "libavutil/common.h"
 #include "libavutil/internal.h"
 #include "libavutil/intreadwrite.h"
 #include "libavcodec/avcodec.h"
-#include "libavcodec/dsputil.h"
+#include "libavcodec/pixblockdsp.h"
+#include "libavcodec/idctdsp.h"
+#include "libavcodec/fdctdsp.h"
 
 #undef fprintf
 #undef free
@@ -99,13 +102,15 @@ struct vf_priv_s {
         uint8_t *src;
         int16_t *temp;
         AVCodecContext *avctx;
-        DSPContext dsp;
+        IDCTDSPContext idsp;
+        FDCTDSPContext fdsp;
+        PixblockDSPContext pdsp;
         char *non_b_qp;
 };
 
 #define SHIFT 22
 
-static void hardthresh_c(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *permutation){
+static void hardthresh_c(int16_t dst[64], int16_t src[64], int qp, uint8_t *permutation){
         int i;
         int bias= 0; //FIXME
         unsigned int threshold1, threshold2;
@@ -113,7 +118,7 @@ static void hardthresh_c(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *perm
         threshold1= qp*((1<<4) - bias) - 1;
         threshold2= (threshold1<<1);
 
-        memset(dst, 0, 64*sizeof(DCTELEM));
+        memset(dst, 0, 64*sizeof(int16_t));
         dst[0]= (src[0] + 4)>>3;
 
         for(i=1; i<64; i++){
@@ -125,7 +130,7 @@ static void hardthresh_c(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *perm
         }
 }
 
-static void softthresh_c(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *permutation){
+static void softthresh_c(int16_t dst[64], int16_t src[64], int qp, uint8_t *permutation){
         int i;
         int bias= 0; //FIXME
         unsigned int threshold1, threshold2;
@@ -133,7 +138,7 @@ static void softthresh_c(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *perm
         threshold1= qp*((1<<4) - bias) - 1;
         threshold2= (threshold1<<1);
 
-        memset(dst, 0, 64*sizeof(DCTELEM));
+        memset(dst, 0, 64*sizeof(int16_t));
         dst[0]= (src[0] + 4)>>3;
 
         for(i=1; i<64; i++){
@@ -148,8 +153,8 @@ static void softthresh_c(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *perm
         }
 }
 
-#if HAVE_MMX
-static void hardthresh_mmx(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *permutation){
+#if HAVE_MMX_INLINE
+static void hardthresh_mmx(int16_t dst[64], int16_t src[64], int qp, uint8_t *permutation){
         int bias= 0; //FIXME
         unsigned int threshold1;
 
@@ -217,7 +222,7 @@ static void hardthresh_mmx(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *pe
         dst[0]= (src[0] + 4)>>3;
 }
 
-static void softthresh_mmx(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *permutation){
+static void softthresh_mmx(int16_t dst[64], int16_t src[64], int qp, uint8_t *permutation){
         int bias= 0; //FIXME
         unsigned int threshold1;
 
@@ -294,7 +299,7 @@ static void softthresh_mmx(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *pe
 }
 #endif
 
-static inline void add_block(int16_t *dst, int stride, DCTELEM block[64]){
+static inline void add_block(int16_t *dst, int stride, int16_t block[64]){
         int y;
 
         for(y=0; y<8; y++){
@@ -329,7 +334,7 @@ static void store_slice_c(uint8_t *dst, int16_t *src, int dst_stride, int src_st
         }
 }
 
-#if HAVE_MMX
+#if HAVE_MMX_INLINE
 static void store_slice_mmx(uint8_t *dst, int16_t *src, int dst_stride, int src_stride, int width, int height, int log2_scale){
         int y;
 
@@ -372,15 +377,15 @@ static void store_slice_mmx(uint8_t *dst, int16_t *src, int dst_stride, int src_
 
 static void (*store_slice)(uint8_t *dst, int16_t *src, int dst_stride, int src_stride, int width, int height, int log2_scale)= store_slice_c;
 
-static void (*requantize)(DCTELEM dst[64], DCTELEM src[64], int qp, uint8_t *permutation)= hardthresh_c;
+static void (*requantize)(int16_t dst[64], int16_t src[64], int qp, uint8_t *permutation)= hardthresh_c;
 
 static void filter(struct vf_priv_s *p, uint8_t *dst, uint8_t *src, int dst_stride, int src_stride, int width, int height, uint8_t *qp_store, int qp_stride, int is_luma){
         int x, y, i;
         const int count= 1<<p->log2_count;
         const int stride= is_luma ? p->temp_stride : ((width+16+15)&(~15));
         uint64_t __attribute__((aligned(16))) block_align[32];
-        DCTELEM *block = (DCTELEM *)block_align;
-        DCTELEM *block2= (DCTELEM *)(block_align+16);
+        int16_t *block = (int16_t *)block_align;
+        int16_t *block2= (int16_t *)(block_align+16);
 
         if (!src || !dst) return; // HACK avoid crash for Y8 colourspace
         for(y=0; y<height; y++){
@@ -413,10 +418,10 @@ static void filter(struct vf_priv_s *p, uint8_t *dst, uint8_t *src, int dst_stri
                                 const int x1= x + offset[i+count-1][0];
                                 const int y1= y + offset[i+count-1][1];
                                 const int index= x1 + y1*stride;
-                                p->dsp.get_pixels(block, p->src + index, stride);
-                                p->dsp.fdct(block);
-                                requantize(block2, block, qp, p->dsp.idct_permutation);
-                                p->dsp.idct(block2);
+                                p->pdsp.get_pixels(block, p->src + index, stride);
+                                p->fdsp.fdct(block);
+                                requantize(block2, block, qp, p->idsp.idct_permutation);
+                                p->idsp.idct(block2);
                                 add_block(p->temp + index, stride, block2);
                         }
                 }
@@ -507,10 +512,10 @@ static int put_image(struct vf_instance *vf, mp_image_t *mpi, double pts){
             }
         }
 
-#if HAVE_MMX
+#if HAVE_MMX_INLINE
         if(gCpuCaps.hasMMX) __asm__ volatile ("emms\n\t");
 #endif
-#if HAVE_MMX2
+#if HAVE_MMXEXT_INLINE
         if(gCpuCaps.hasMMX2) __asm__ volatile ("sfence\n\t");
 #endif
 
@@ -524,8 +529,8 @@ static void uninit(struct vf_instance *vf){
         vf->priv->temp= NULL;
         free(vf->priv->src);
         vf->priv->src= NULL;
-//        free(vf->priv->avctx);
-//        vf->priv->avctx= NULL;
+        free(vf->priv->avctx);
+        vf->priv->avctx= NULL;
         free(vf->priv->non_b_qp);
         vf->priv->non_b_qp= NULL;
 
@@ -578,8 +583,10 @@ static int vf_open(vf_instance_t *vf, char *args){
 
     init_avcodec();
 
-//    vf->priv->avctx= avcodec_alloc_context3(NULL);
-//    ff_dsputil_init(&vf->priv->dsp, vf->priv->avctx);
+    vf->priv->avctx= avcodec_alloc_context3(NULL);
+    ff_pixblockdsp_init(&vf->priv->pdsp, vf->priv->avctx);
+    ff_idctdsp_init(&vf->priv->idsp, vf->priv->avctx);
+    ff_fdctdsp_init(&vf->priv->fdsp, vf->priv->avctx);
 
     vf->priv->log2_count= 3;
 
@@ -597,7 +604,7 @@ static int vf_open(vf_instance_t *vf, char *args){
         case 1: requantize= softthresh_c; break;
     }
 
-#if HAVE_MMX
+#if HAVE_MMX_INLINE
     if(gCpuCaps.hasMMX){
         store_slice= store_slice_mmx;
         switch(vf->priv->mode&3){

@@ -21,7 +21,7 @@
 
 #include <stdint.h>
 
-enum CodecID mp_tag2codec_id(uint32_t tag, int audio);
-uint32_t mp_codec_id2tag(enum CodecID codec_id, uint32_t old_tag, int audio);
+enum AVCodecID mp_tag2codec_id(uint32_t tag, int audio);
+uint32_t mp_codec_id2tag(enum AVCodecID codec_id, uint32_t old_tag, int audio);
 
 #endif /* MPLAYER_MP_TAGLISTS_H */

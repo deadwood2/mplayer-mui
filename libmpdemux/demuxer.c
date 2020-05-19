@@ -469,7 +469,7 @@ static void ds_add_packet_internal(demux_stream_t *ds, demux_packet_t *dp)
 #ifdef CONFIG_FFMPEG
 static void allocate_parser(AVCodecContext **avctx, AVCodecParserContext **parser, unsigned format)
 {
-    enum CodecID codec_id = CODEC_ID_NONE;
+    enum AVCodecID codec_id = CODEC_ID_NONE;
 
     init_avcodec();
 
