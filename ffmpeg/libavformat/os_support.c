@@ -40,6 +40,12 @@
 #include <sys/select.h>
 #endif /* HAVE_WINSOCK2_H */
 #endif /* !HAVE_POLL_H */
+#if defined(__MORPHOS__) && !defined(__AROS__)
+#include <sys/filio.h>
+#endif
+#if defined(__AROS__)
+#include <sys/ioctl.h>
+#endif
 
 #include "network.h"
 
@@ -257,6 +263,10 @@ int ff_socket_nonblock(int socket, int enable)
 #if HAVE_WINSOCK2_H
     u_long param = enable;
     return ioctlsocket(socket, FIONBIO, &param);
+#elif defined(__MORPHOS__)
+    char on = (char) enable;
+    return MyIoctlSocket(socket, FIONBIO, (char *)&on);
+    return 0;
 #else
     if (enable)
         return fcntl(socket, F_SETFL, fcntl(socket, F_GETFL) | O_NONBLOCK);
@@ -313,12 +323,12 @@ int ff_poll(struct pollfd *fds, nfds_t numfds, int timeout)
         return 0;
 
     if (timeout < 0) {
-        rc = select(n, &read_set, &write_set, &exception_set, NULL);
+        rc = myselect(n, &read_set, &write_set, &exception_set, NULL);
     } else {
         struct timeval tv;
         tv.tv_sec  = timeout / 1000;
         tv.tv_usec = 1000 * (timeout % 1000);
-        rc         = select(n, &read_set, &write_set, &exception_set, &tv);
+        rc         = myselect(n, &read_set, &write_set, &exception_set, &tv);
     }
 
     if (rc < 0)

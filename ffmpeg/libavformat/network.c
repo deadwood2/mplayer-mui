@@ -26,6 +26,10 @@
 #include "libavutil/mem.h"
 #include "libavutil/time.h"
 
+#ifdef __MORPHOS__
+#define D(x) x
+#endif
+
 #if HAVE_THREADS
 #if HAVE_PTHREADS
 #include <pthread.h>
@@ -144,6 +148,24 @@ int ff_network_init(void)
     if (WSAStartup(MAKEWORD(1,1), &wsaData))
         return 0;
 #endif
+
+#ifdef __MORPHOS__
+    if(!ffmpegSocketBase)
+    {
+		D(kprintf("Opening ffmpeg socketbase\n"));
+		ffmpegSocketBase = SocketBase = OpenLibrary("bsdsocket.library", 0);
+
+        if(ffmpegSocketBase)
+        {
+            if(MySocketBaseTags(
+                SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (ULONG) &errno,
+				//SBTM_SETVAL(SBTC_HERRNOLONGPTR), (ULONG) &h_errno,
+				SBTM_SETVAL(SBTC_LOGTAGPTR), (ULONG) "ffmpeg",
+            TAG_DONE))
+			return 0;
+        }
+    }
+#endif
     return 1;
 }
 
@@ -180,6 +202,15 @@ void ff_network_close(void)
 {
 #if HAVE_WINSOCK2_H
     WSACleanup();
+#endif
+
+#ifdef __MORPHOS__
+    if(ffmpegSocketBase)
+    {
+		D(kprintf("Closing ffmpeg socketbase\n"));
+        CloseLibrary(ffmpegSocketBase);
+        ffmpegSocketBase = SocketBase = NULL;
+    }
 #endif
 }
 

@@ -103,6 +103,11 @@
 
 #include "libavutil/avassert.h"
 
+#ifdef __MORPHOS__
+#include <exec/types.h>
+struct Library *ffmpegSocketBase;
+#endif
+
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
 

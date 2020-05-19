@@ -21,6 +21,12 @@
 #ifndef AVFORMAT_NETWORK_H
 #define AVFORMAT_NETWORK_H
 
+#ifdef __MORPHOS__
+#undef SOCKET_BASE_NAME
+#define SOCKET_BASE_NAME ffmpegSocketBase
+extern struct Library *ffmpegSocketBase;
+#endif
+
 #include <errno.h>
 #include <stdint.h>
 
@@ -70,6 +76,58 @@ int ff_neterrno(void);
 
 #if HAVE_POLL_H
 #include <poll.h>
+#endif
+
+#ifdef __MORPHOS__
+#include <proto/exec.h>
+#include <stdarg.h>
+#include <proto/socket.h>
+#include <bsdsocket/socketbasetags.h>
+#include <clib/debug_protos.h>
+
+
+#if defined(__AROS__)
+#define MyWaitSelect WaitSelect
+#define MySocketBaseTagList SocketBaseTagList
+#define MySocketBaseTags SocketBaseTags
+#define MyIoctlSocket IoctlSocket
+
+#else
+#define MySocketBaseTagList(__p0) \
+        LP1(294, LONG , SocketBaseTagList, \
+                struct TagItem *, __p0, a0, \
+                , ffmpegSocketBase, 0, 0, 0, 0, 0, 0)
+
+#define MySocketBaseTags(...) \
+        ({ULONG _tags[] = { __VA_ARGS__ }; \
+        MySocketBaseTagList((struct TagItem *)_tags);})
+
+#define MyWaitSelect(__p0, __p1, __p2, __p3, __p4, __p5) \
+        LP6(126, LONG , WaitSelect, \
+                LONG , __p0, d0, \
+                fd_set *, __p1, a0, \
+                fd_set *, __p2, a1, \
+                fd_set *, __p3, a2, \
+                struct timeval *, __p4, a3, \
+                ULONG *, __p5, d1, \
+                , ffmpegSocketBase, 0, 0, 0, 0, 0, 0)
+
+#define MyIoctlSocket(__p0, __p1, __p2) \
+	LP3(114, LONG , IoctlSocket, \
+		LONG , __p0, d0, \
+		ULONG , __p1, d1, \
+		char *, __p2, a0, \
+		, ffmpegSocketBase, 0, 0, 0, 0, 0, 0)
+
+#endif
+
+static int myselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exeptfds,
+     struct timeval *timeout)
+{
+  return MyWaitSelect(nfds, readfds, writefds, exeptfds, timeout, NULL);
+    return 0;
+}
+
 #endif
 
 int ff_socket_nonblock(int socket, int enable);
