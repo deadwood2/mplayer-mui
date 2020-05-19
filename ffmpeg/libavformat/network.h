@@ -87,6 +87,7 @@ int ff_neterrno(void);
 
 
 #if defined(__AROS__)
+#include <aros/debug.h>
 #define MyWaitSelect WaitSelect
 #define MySocketBaseTagList SocketBaseTagList
 #define MySocketBaseTags SocketBaseTags

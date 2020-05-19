@@ -21,6 +21,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <ctype.h>
 #include <unistd.h>
 #include <proto/dos.h>
 #include <intuition/intuition.h>
