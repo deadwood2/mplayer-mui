@@ -55,6 +55,7 @@ DEFCLASS(scalegroup);
 DEFCLASS(audiogaingroup);
 DEFCLASS(consolegroup);
 DEFCLASS(consolelist);
+DEFCLASS(equalizergroup);
 
 #define MTAGBASE (TAG_USER|((0xDEADL<<16)+0))
 
@@ -232,6 +233,11 @@ enum {
 	/* ConsoleGroup */
 	MM_ConsoleGroup_AddMessage,
 	MM_ConsoleGroup_Clear,
+
+	/* EqualizerGroup */
+	MM_EqualizerGroup_Apply,
+	MM_EqualizerGroup_Reset,
+	MM_EqualizerGroup_Cancel,
 
 	MA_dummyend
 };

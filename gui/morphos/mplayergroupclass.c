@@ -2633,6 +2633,10 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 			set(mygui->audiogainwindow, MUIA_Window_Open, TRUE);
 			break;
 
+		case MEN_EQUALIZER:
+			set(mygui->equalizerwindow, MUIA_Window_Open, TRUE);
+			break;
+
 		/* Subtitles */
 		case MEN_CYCLESUBTITLE:
 			DoMethod(mygui->maingroup, MM_MPlayerGroup_CycleSubtitles);

@@ -175,6 +175,7 @@ static struct NewMenu MenuData[] =
 	{ NM_ITEM , (UBYTE *) "Decrease Delay"           ,(UBYTE *) 0,0 ,0 ,(APTR)MEN_AUDIODECDELAY },
 	{ NM_ITEM  , NM_BARLABEL                         , 0 ,0 ,0         ,(APTR)0            },
 	{ NM_ITEM , (UBYTE *) "Volume Gain..."           ,(UBYTE *) 0,0 ,0 ,(APTR)MEN_AUDIOGAIN },
+	{ NM_ITEM , (UBYTE *) "Equalizer..."             ,(UBYTE *) 0,0 ,0 ,(APTR)MEN_EQUALIZER },
 	{ NM_ITEM , (UBYTE *) "Filters"                  ,(UBYTE *) 0,0 ,0 ,(APTR)MEN_AUDIOFILTER },
 	{ NM_SUB  , (UBYTE *) "Extra Stereo"             ,(UBYTE *) 0,CHECKIT|MENUTOGGLE ,0     ,(APTR)MEN_EXTRASTEREO },
 	{ NM_SUB  , (UBYTE *) "Karaoke"                  ,(UBYTE *) 0,CHECKIT|MENUTOGGLE ,0     ,(APTR)MEN_KARAOKE },
@@ -497,10 +498,12 @@ int creategui(void)
 	APTR menustrip = NULL;
 	APTR mainwindow = NULL, prefswindow = NULL,
 		 urlwindow = NULL, dvddirwindow = NULL, playlistwindow = NULL, propertieswindow = NULL,
-		 cropwindow = NULL, scalewindow = NULL, audiogainwindow = NULL, consolewindow = NULL;
+		 cropwindow = NULL, scalewindow = NULL, audiogainwindow = NULL, consolewindow = NULL,
+		 equalizerwindow = NULL;
 	APTR GR_MPlayerGroup = NULL, GR_PlaylistGroup = NULL, GR_URLGroup = NULL,
 		 GR_DVDDirGroup = NULL, GR_PropertiesGroup = NULL, GR_PrefsGroup = NULL,
-		 GR_CropGroup = NULL, GR_ScaleGroup = NULL, GR_AudioGainGroup = NULL, GR_ConsoleGroup = NULL;
+		 GR_CropGroup = NULL, GR_ScaleGroup = NULL, GR_AudioGainGroup = NULL, GR_ConsoleGroup = NULL,
+		 GR_EqualizerGroup = NULL;
 	APTR aboutwindow = NULL;
 
 	snprintf(iconpath, sizeof(iconpath), "%s.info", _ProgramName);
@@ -631,6 +634,15 @@ int creategui(void)
 					WindowContents,
 						GR_ConsoleGroup = NewObject(getconsolegroupclass(), NULL, TAG_DONE),
 			End,
+
+			SubWindow, equalizerwindow = WindowObject,
+					MUIA_Window_ScreenTitle, muititle,
+					MUIA_Window_Title, "Equalizer",
+					MUIA_Window_ID   , MAKE_ID('M','P','E','Q'),
+					WindowContents,
+						GR_EqualizerGroup = NewObject(getequalizergroupclass(), NULL, TAG_DONE),
+			End,
+
 
 	End;
 
@@ -765,6 +777,9 @@ int creategui(void)
 	DoMethod(consolewindow, MUIM_Notify, MUIA_Window_CloseRequest, TRUE,
 			 consolewindow, 3, MUIM_Set, MUIA_Window_Open, FALSE);
 
+	DoMethod(equalizerwindow, MUIM_Notify, MUIA_Window_CloseRequest, TRUE,
+			 equalizerwindow, 3, MUIM_Set, MUIA_Window_Open, FALSE);
+
 	set(mainwindow, MUIA_Window_Open, TRUE);
 
 	mygui->last_status_update = 0;
@@ -790,6 +805,9 @@ int creategui(void)
 	mygui->audiogaingroup = GR_AudioGainGroup;
 	mygui->consolewindow = consolewindow;
 	mygui->consolegroup = GR_ConsoleGroup;
+	mygui->equalizerwindow = equalizerwindow;
+	mygui->equalizergroup = GR_EqualizerGroup;
+
 
 	/* video attributes retrieved here */
 	mygui->videowindow = (struct Window *) getv(mainwindow, MUIA_Window);
@@ -862,6 +880,7 @@ quit:
 		if(scalewindow)      set(scalewindow, MUIA_Window_Open, FALSE);
 		if(audiogainwindow)  set(audiogainwindow, MUIA_Window_Open, FALSE);
 		if(consolewindow)    set(consolewindow, MUIA_Window_Open, FALSE);
+		if(equalizerwindow)  set(equalizerwindow, MUIA_Window_Open, FALSE);
 
 		if(mygui->screen) CloseScreen(mygui->screen);
 		mygui->screen = NULL;

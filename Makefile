@@ -592,7 +592,8 @@ SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
 								gui/morphos/scalegroupclass.c \
 								gui/morphos/audiogaingroupclass.c \
 								gui/morphos/consolegroupclass.c \
-								gui/morphos/consolelistclass.c
+								gui/morphos/consolelistclass.c \
+								gui/morphos/equalizergroupclass.c
 
 SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
 								gui/morphos/classes.c \

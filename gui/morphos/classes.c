@@ -41,6 +41,7 @@ static const struct classdesc cd[] = {
 	CLASSENT(audiogaingroup),
 	CLASSENT(consolegroup),
 	CLASSENT(consolelist),
+	CLASSENT(equalizergroup),
 //	  CLASSENT(prefsgroup),
 //	  CLASSENT(aboutgroup),
 	{ 0, 0, 0 }

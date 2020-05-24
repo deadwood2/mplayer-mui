@@ -124,6 +124,7 @@ MEN_VOLNORM,
 MEN_KARAOKE,
 MEN_SCALETEMPO,
 MEN_ANTICLICK,
+MEN_EQUALIZER,
 MEN_AUDIOTRACKBASE = 5000,
 
 /* Video */
@@ -195,6 +196,7 @@ struct gui_t
 	APTR scalegroup;
 	APTR audiogaingroup;
 	APTR consolegroup;
+	APTR equalizergroup;
 
 	APTR aboutwindow;
 	APTR mainwindow;
@@ -207,6 +209,7 @@ struct gui_t
 	APTR scalewindow;
 	APTR audiogainwindow;
 	APTR consolewindow;
+	APTR equalizerwindow;
 
 	ULONG colorkey; /* overlay colorkey pen */
 	APTR videoarea; /* video object area */
