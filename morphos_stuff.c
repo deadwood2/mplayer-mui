@@ -25,7 +25,6 @@
 #include "mixer.h"
 #include "mp_core.h"
 #include "playtree.h"
-#include "version.h"
 #include "input/input.h"
 #include "stream/stream.h"
 #include "libmpdemux/demuxer.h"
@@ -1088,7 +1087,8 @@ void rexx_handle_events (void)
 /**********************************************************************************************************************/
 
 #ifdef __AROS__
-#define BUILD_DATE "14.04.2012"
+#define BUILD_DATE "24.05.2020"
+#define VERSION ""
 const char version[] = "$VER: MPlayer 1.0 ("BUILD_DATE") © MPlayer Team";
 const char muiversion[] = "$VER: MPlayer 1.0 ("BUILD_DATE")";
 const char muititle[] = "MPlayer 1.0 ("BUILD_DATE") "VERSION;

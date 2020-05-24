@@ -55,9 +55,12 @@ CONST TEXT credits[] =
 	"\033bMorphOS Port:\033n\n"
 	"\t(C) 2003-2004 by Nicolas Det\n"
 	"\t(C) 2005-2011 by Fabien Coeurjoly\n\n"
+	"\033bAROS/AxRuntime Port:\033n\n"
+	"\t(C) 2008-2020 by Krzysztof Smiechowicz\n\n"
 	"\033bReferences:\033n\n"
 	"\thttp://mplayerhq.hu\n"
-	"\thttp://fabportnawak.free.fr/mplayer/";
+	"\thttp://fabportnawak.free.fr/mplayer/\n"
+	"\thttps://github.com/deadw00d/mplayer-mui";
 
 static struct NewMenu MenuData[] =
 {
