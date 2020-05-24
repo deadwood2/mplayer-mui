@@ -465,9 +465,11 @@ DEFTMETHOD(PrefsGroup_Store)
 	struct PrefsGeneralGroupData *data = INST_DATA(cl, obj);
 
 /* general */
+
 	/* output drivers */
 	listSet(&video_driver_list, (STRPTR) getv(data->ST_VideoDrivers, MUIA_Text_Contents));
-	listRepl(&video_driver_list, NULL, "cgx_wpa"); // Always add wpa as fallback
+	if (strcmp((STRPTR) getv(data->ST_VideoDrivers, MUIA_Text_Contents), "cgx_wpa") != 0)
+		listRepl(&video_driver_list, NULL, "cgx_wpa"); // Always add wpa as fallback
 
 	/* update embedded mode */
 	mygui->embedded = FALSE;
