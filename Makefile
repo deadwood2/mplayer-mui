@@ -593,34 +593,8 @@ SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
 								gui/morphos/audiogaingroupclass.c \
 								gui/morphos/consolegroupclass.c \
 								gui/morphos/consolelistclass.c \
-								gui/morphos/equalizergroupclass.c
-
-SRCS_MPLAYER-$(GUI_MUI)      += gui/morphos/gui.c \
-								gui/morphos/classes.c \
-								gui/morphos/interface.c \
-								gui/morphos/thread.c \
-								gui/morphos/cfg.c \
-								gui/morphos/playlist.c \
-								gui/morphos/appclass.c \
-								gui/morphos/mplayerwindowclass.c \
-								gui/morphos/mplayergroupclass.c \
-								gui/morphos/playlistgroupclass.c \
-								gui/morphos/urlgroupclass.c \
-								gui/morphos/dvddirgroupclass.c \
-								gui/morphos/propertiesgroupclass.c \
-								gui/morphos/prefsgroupclass.c \
-								gui/morphos/prefslistclass.c \
-								gui/morphos/prefsgeneralgroupclass.c \
-								gui/morphos/playlistlistclass.c \
-								gui/morphos/seeksliderclass.c \
-								gui/morphos/volumesliderclass.c \
-								gui/morphos/picturebuttonclass.c \
-								gui/morphos/spacerclass.c \
-								gui/morphos/videoareaclass.c \
-								gui/morphos/poplistclass.c \
-								gui/morphos/popstringclass.c \
-								gui/morphos/prefspopstringclass.c \
-                                aros/aros_stuff.c \
+								gui/morphos/equalizergroupclass.c \
+								aros/aros_stuff.c
 
 SRCS_MPLAYER-$(IVTV)         += libao2/ao_ivtv.c libvo/vo_ivtv.c
 SRCS_MPLAYER-$(JACK)         += libao2/ao_jack.c
