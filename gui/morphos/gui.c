@@ -184,7 +184,6 @@ static struct NewMenu MenuData[] =
 	{ NM_SUB  , (UBYTE *) "Karaoke"                  ,(UBYTE *) 0,CHECKIT|MENUTOGGLE ,0     ,(APTR)MEN_KARAOKE },
 	{ NM_SUB  , (UBYTE *) "Volume Normalization"     ,(UBYTE *) 0,CHECKIT|MENUTOGGLE ,0     ,(APTR)MEN_VOLNORM },
 	{ NM_SUB  , (UBYTE *) "Scale Tempo"              ,(UBYTE *) 0,CHECKIT|MENUTOGGLE ,0     ,(APTR)MEN_SCALETEMPO },
-	{ NM_SUB  , (UBYTE *) "Anticlick"                ,(UBYTE *) 0,CHECKIT|MENUTOGGLE ,0     ,(APTR)MEN_ANTICLICK },
 
 	/* Subtitles */
 	{ NM_TITLE, (UBYTE *) "Subtitles"                , 0 ,0 ,0             ,(APTR)0 },

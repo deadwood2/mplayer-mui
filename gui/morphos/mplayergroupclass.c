@@ -1444,9 +1444,6 @@ DEFSMETHOD(MPlayerGroup_AudioFilter)
 		case MEN_SCALETEMPO:
 			filter = "scaletempo";
 			break;
-		case MEN_ANTICLICK:
-			filter = "equalizer=0:0:0:0:0:-2:-5:-7:-5:0";
-			break;
 	}
 
 	if(checked)
@@ -2466,7 +2463,6 @@ DEFSMETHOD(MPlayerGroup_HandleMenu)
 		case MEN_VOLNORM:
 		case MEN_KARAOKE:
 		case MEN_SCALETEMPO:
-		case MEN_ANTICLICK:
 			DoMethod(mygui->maingroup, MM_MPlayerGroup_AudioFilter, (IPTR) msg->userdata);
 			break;
 
