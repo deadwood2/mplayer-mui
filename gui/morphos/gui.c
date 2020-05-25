@@ -509,7 +509,7 @@ int creategui(void)
 		 GR_EqualizerGroup = NULL;
 	APTR aboutwindow = NULL;
 
-	snprintf(iconpath, sizeof(iconpath), "%s.info", _ProgramName);
+	snprintf(iconpath, sizeof(iconpath), "PROGDIR:%s.info", _ProgramName);
 
 #if !defined(__AROS__)
 	if (!(MUIMasterBase = OpenLibrary((UBYTE *)MUIMASTER_NAME, MUIMASTER_VMIN)))
