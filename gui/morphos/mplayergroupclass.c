@@ -1475,11 +1475,10 @@ DEFSMETHOD(MPlayerGroup_AudioFilter)
 	return 0;
 }
 
-DEFSMETHOD(MPlayerGroup_AudioGain)
+static VOID MPlayerGroup_AfDel(char *filter)
 {
 	char index[10];
 	int i;
-	char * filter = "volume=";
 
 	if(af_cfg.list)
 	{
@@ -1494,6 +1493,13 @@ DEFSMETHOD(MPlayerGroup_AudioGain)
 
 		m_config_set_option(mconfig, "af-del", index);
 	}
+}
+
+DEFSMETHOD(MPlayerGroup_AudioGain)
+{
+	char *filter = "volume=";
+
+	MPlayerGroup_AfDel(filter);
 
 	if(msg->enable)
 	{
@@ -1507,188 +1513,23 @@ DEFSMETHOD(MPlayerGroup_AudioGain)
 	return 0;
 }
 
-#if 0
-DEFSMETHOD(MPlayerGroup_AudioFilter)
+DEFSMETHOD(MPlayerGroup_Equalizer)
 {
-	char buffer[256];
-	int	i;
-	ULONG checked;
-	char index[10];
-	char * action;
-	char * filter = NULL;
+	char *filter = "equalizer=";
 
-	DoMethod(mygui->menustrip, MUIM_GetUData, msg->which, MUIA_Menuitem_Checked, &checked);
-
-	action = checked ? "af-add" : "af-del";
-
-	switch(msg->which)
-	{
-		case MEN_EXTRASTEREO:
-			filter = "extrastereo";
-			if(guiInfo.Playing)
-			{
-				mp_input_queue_cmd(mp_input_parse_cmd("af_del extrastereo"));
-			}
-
-		    for (i = 0; af_cfg.list [i]; ++i)
-			{
-				if(!strcmp(filter, af_cfg.list[i]))
-				{
-					snprintf(index, sizeof(index), "%d", i);
-					break;
-				}
-			}
-
-			m_config_set_option(mconfig, action, index);
-
-			break;
-		case MEN_VOLNORM:
-			filter = "volnorm=2";
-			if(guiInfo.Playing)
-			{
-				mp_input_queue_cmd(mp_input_parse_cmd("af_del volnorm"));
-			}
-
-
-		    for (i = 0; af_cfg.list [i]; ++i)
-			{
-				if(!strcmp("volnorm=", af_cfg.list[i]))
-				{
-					snprintf(index, sizeof(index), "%d", i);
-					break;
-				}
-			}
-
-			m_config_set_option(mconfig, action, index);
-
-			break;
-		case MEN_KARAOKE:
-			filter = "karaoke";
-            if(guiInfo.Playing)
-			{
-				mp_input_queue_cmd(mp_input_parse_cmd("af_del format=s16be"));
-				mp_input_queue_cmd(mp_input_parse_cmd("af_del karaoke"));
-			}
-
-		    for (i = 0; af_cfg.list [i]; ++i)
-			{
-				if(!strcmp(filter, af_cfg.list[i]))
-				{
-					snprintf(index, sizeof(index), "%d", i);
-					break;
-				}
-			}
-
-			m_config_set_option(mconfig, action, index);
-
-		    for (i = 0; af_cfg.list [i]; ++i)
-			{
-				if(!strcmp("format=s16be", af_cfg.list[i]))
-				{
-					snprintf(index, sizeof(index), "%d", i);
-					break;
-				}
-			}
-
-			m_config_set_option(mconfig, action, index);
-
-			break;
-		case MEN_SCALETEMPO:
-			filter = "scaletempo";
-            if(guiInfo.Playing)
-			{
-				mp_input_queue_cmd(mp_input_parse_cmd("af_del scaletempo"));
-			}
-
-		    for (i = 0; af_cfg.list [i]; ++i)
-			{
-				if(!strcmp(filter, af_cfg.list[i]))
-				{
-					snprintf(index, sizeof(index), "%d", i);
-					break;
-				}
-			}
-
-			m_config_set_option(mconfig, action, index);
-
-			break;
-	}
-
-	/* Realtime */
-	if(guiInfo.Playing)
-	{
-		if(checked)
-		{
-			snprintf(buffer, sizeof(buffer), "af_add %s", filter);
-			mp_input_queue_cmd(mp_input_parse_cmd(buffer));
-
-			if(msg->which == MEN_KARAOKE)
-			{
-				snprintf(buffer, sizeof(buffer), "af_add format=s16be");
-				mp_input_queue_cmd(mp_input_parse_cmd(buffer));
-			}
-		}
-	}
-
-	/* Options */
-	if(checked)
-	{
-		m_config_set_option(mconfig, action, filter);
-
-		if(msg->which == MEN_KARAOKE)
-		{
-			m_config_set_option(mconfig, "af-add", "format=s16be");
-		}
-	}
-
-	return 0;
-}
-
-DEFSMETHOD(MPlayerGroup_AudioGain)
-{
-	char buffer[256];
-	char index[10];
-	int i;
-	char * filter = "volume=";
-
-	/* Realtime */
-	if(guiInfo.Playing)
-	{
-		snprintf(buffer, sizeof(buffer), "af_del volume");
-		mp_input_queue_cmd(mp_input_parse_cmd(buffer));
-
-		if(msg->enable)
-		{
-			snprintf(buffer, sizeof(buffer), "af_add volume=%ld", msg->gain);
-			mp_input_queue_cmd(mp_input_parse_cmd(buffer));
-		}
-	}
-
-	/* Options */
-	if(af_cfg.list)
-	{
-	    for (i = 0; af_cfg.list [i]; ++i)
-		{
-			if(strstr(af_cfg.list[i], filter))
-			{
-				snprintf(index, sizeof(index), "%d", i);
-				break;
-			}
-		}
-
-		m_config_set_option(mconfig, "af-del", index);
-	}
+	MPlayerGroup_AfDel(filter);
 
 	if(msg->enable)
 	{
 		char full[256];
-		snprintf(full, sizeof(full), "%s%ld", filter, msg->gain);
+		snprintf(full, sizeof(full), "%s%s", filter, msg->param);
 		m_config_set_option(mconfig, "af-add", full);
 	}
 
+	mygui->playercontrol(evLoadPlay, 0);
+
 	return 0;
 }
-#endif
 
 DEFSMETHOD(MPlayerGroup_Open)
 {
@@ -3468,6 +3309,7 @@ DECTMETHOD(MPlayerGroup_UpdateAll)
 DECSMETHOD(MPlayerGroup_SetWindow)
 DECSMETHOD(MPlayerGroup_SetValues)
 DECSMETHOD(MPlayerGroup_HandleMenu)
+DECSMETHOD(MPlayerGroup_Equalizer)
 ENDMTABLE
 
 DECSUBCLASS_NC(MUIC_Group, mplayergroupclass, MPlayerGroupData)

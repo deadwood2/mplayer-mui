@@ -149,6 +149,7 @@ enum {
 	MM_MPlayerGroup_DecreaseAVDelay,
 	MM_MPlayerGroup_AudioGain,
 	MM_MPlayerGroup_AudioFilter,
+	MM_MPlayerGroup_Equalizer,
 
 	MM_MPlayerGroup_Update,
 	MM_MPlayerGroup_UpdateAll,
@@ -237,7 +238,7 @@ enum {
 	/* EqualizerGroup */
 	MM_EqualizerGroup_Apply,
 	MM_EqualizerGroup_Reset,
-	MM_EqualizerGroup_Cancel,
+	MM_EqualizerGroup_Close,
 
 	MA_dummyend
 };
@@ -395,6 +396,12 @@ struct MP_MPlayerGroup_AudioFilter {
 struct MP_MPlayerGroup_AudioGain {
 	STACKED ULONG MethodID;
 	STACKED LONG gain;
+	STACKED LONG enable;
+};
+
+struct MP_MPlayerGroup_Equalizer {
+	STACKED ULONG MethodID;
+	STACKED TEXT *param;
 	STACKED LONG enable;
 };
 
