@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include <osdep/timer.h>
 
@@ -697,7 +698,10 @@ static int play(void* data,int len,int flags){
 	   imax = data_to_put / 4;
    	   for (i = 0; i < imax; i++)
 	   {
-		   ((LONG *) (buffer + buffer_put))[i] = lrintf(2147483647.0 * (((float *)data)[i]));
+		   QUAD _t = llrintf(2147483647.0f * (((float *)data)[i]));
+		   if (_t > INT_MAX) _t = INT_MAX;
+		   if (_t < INT_MIN) _t = INT_MIN;
+		   ((LONG *) (buffer + buffer_put))[i] = (LONG)_t;
 	   }
 	   break;
 
@@ -705,7 +709,10 @@ static int play(void* data,int len,int flags){
 	   imax = data_to_put / 4;
 	   for (i = 0; i < imax; i++)
 	   {
-		   ((LONG *) (buffer + buffer_put))[i] = SWAPLONG(lrintf(2147483647.0 * (((float *)data)[i])));
+		   QUAD _t = llrintf(2147483647.0f * (((float *)data)[i]));
+		   if (_t > INT_MAX) _t = INT_MAX;
+		   if (_t < INT_MIN) _t = INT_MIN;
+		   ((LONG *) (buffer + buffer_put))[i] = SWAPLONG((LONG)_t);
 	   }
 	   break;
 
@@ -713,7 +720,10 @@ static int play(void* data,int len,int flags){
 	   imax = data_to_put / 2;
    	   for (i = 0; i < imax; i++)
    	   {
-   		   ((WORD *) (buffer + buffer_put))[i] = lrintf(32767.0 * (((float *)data)[i]));
+		   LONG _t = lrintf(32767.0f * (((float *)data)[i]));
+		   if (_t > SHRT_MAX) _t = SHRT_MAX;
+		   if (_t < SHRT_MIN) _t = SHRT_MIN;
+		   ((WORD *) (buffer + buffer_put))[i] = (WORD)_t;
    	   }
    	   break;
 
@@ -721,7 +731,10 @@ static int play(void* data,int len,int flags){
 	   imax = data_to_put / 2;
    	   for (i = 0; i < imax; i++)
    	   {
-       	   ((WORD *) (buffer + buffer_put))[i] = SWAPWORD(lrintf(32767.0 * (((float *)data)[i])));
+		   LONG _t = lrintf(32767.0f * (((float *)data)[i]));
+		   if (_t > SHRT_MAX) _t = SHRT_MAX;
+		   if (_t < SHRT_MIN) _t = SHRT_MIN;
+		   ((WORD *) (buffer + buffer_put))[i] = SWAPWORD((WORD)_t);
 	   }
 	   break;
    }
