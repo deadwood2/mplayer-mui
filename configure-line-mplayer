@@ -6,5 +6,5 @@ r34007
 ./configure --target=i686-aros --disable-mencoder --enable-cross-compile --cc=i386-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-menu --yasm='' --enable-ass-internal --disable-openal
 
 runtime
-./configure --target=x86_64-axrt --disable-mencoder --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-menu --enable-ass-internal --disable-openal --disable-pulse --disable-ossaudio --disable-v4l2 --disable-gl --disable-x11 --enable-debug --disable-protocol=libsmbclient --disable-protocol=libssh --disable-protocol=ffrtmpcrypt --disable-protocol=sctp --disable-decoder=h264_mmal --disable-decoder=h264_qsv --disable-decoder=h264_vda
+./configure --target=x86_64-axrt --disable-mencoder --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-menu --enable-ass-internal --disable-openal --disable-pulse --disable-ossaudio --disable-v4l2 --disable-gl --disable-x11 --disable-protocol=libsmbclient --disable-protocol=libssh --disable-protocol=ffrtmpcrypt --disable-protocol=sctp --disable-decoder=h264_mmal --disable-decoder=h264_qsv --disable-decoder=h264_vda --enable-debug
 
