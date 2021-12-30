@@ -29,12 +29,6 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-#if defined(__AROS__)
-#define lseek64 lseek
-#define off64_t off_t
-typedef long int quad_t;
-#endif
-
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
