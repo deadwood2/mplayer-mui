@@ -6049,7 +6049,7 @@ EOF
 fi
 if test "$_freetype" = yes ; then
     def_freetype='#define CONFIG_FREETYPE 1'
-    extra_ldflags="$extra_ldflags -lfreetype2.static"
+    extra_ldflags="$extra_ldflags -lfreetype2.static -lpng"
 else
     def_freetype='#undef CONFIG_FREETYPE'
 fi
