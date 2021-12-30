@@ -904,6 +904,7 @@ static int aspi_read ( dvdcss_t dvdcss, void *p_buffer, int i_blocks )
 }
 #endif
 
+#if !defined(__MORPHOS__)
 /*****************************************************************************
  * Readv commands.
  *****************************************************************************/
@@ -973,6 +974,7 @@ static int libc_readv ( dvdcss_t dvdcss, struct iovec *p_iovec, int i_blocks )
     return i_read / DVDCSS_BLOCK_SIZE;
 #endif
 }
+#endif
 
 #if defined( WIN32 )
 /*****************************************************************************
