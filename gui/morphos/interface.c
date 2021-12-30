@@ -32,6 +32,7 @@
 #include <cdio/cdio.h>
 #endif
 
+#include "gui/util/mem.h"
 #include "access_mpcontext.h"
 #include "codec-cfg.h"
 #include "command.h"
