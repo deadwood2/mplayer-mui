@@ -1214,7 +1214,17 @@ void MorphOS_ParseArg(int argc, char *argv[], int *new_argc, char ***new_argv)
 	if ( use_gui )
 	{
 		if(WBStartup->sm_NumArgs <= 1)
-			return;
+        {
+            MorphOS_argc = 1;
+            MorphOS_argv = malloc(MorphOS_argc* sizeof(char *) );
+            if (!MorphOS_argv) goto fail;
+
+            /* application name */
+            MorphOS_argv[0] = malloc(strlen(WBStartup->sm_ArgList[0].wa_Name) + 1);
+            if (!MorphOS_argv[0]) goto fail;
+            strcpy(MorphOS_argv[0], WBStartup->sm_ArgList[0].wa_Name);
+        }
+        goto ok;
 	}
 #endif
 #endif
@@ -1270,9 +1280,6 @@ void MorphOS_ParseArg(int argc, char *argv[], int *new_argc, char ***new_argv)
 			MorphOS_argc--;
 		}
 #endif
-
-		*new_argc = MorphOS_argc;
-		*new_argv = MorphOS_argv;
 	}
 	else
 	{
@@ -1330,11 +1337,12 @@ void MorphOS_ParseArg(int argc, char *argv[], int *new_argc, char ***new_argv)
 			}
 		}
 
-		*new_argc = MorphOS_argc;
-		*new_argv = MorphOS_argv;
-
 		FreeAslRequest(MorphOS_FileRequester);
 	}
+
+ok:
+    *new_argc = MorphOS_argc;
+    *new_argv = MorphOS_argv;
 
 	return;
 
