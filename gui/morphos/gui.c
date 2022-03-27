@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <sys/signal.h>
+#include <signal.h>
 
 #include <proto/timer.h>
 #include <dos/dos.h>
