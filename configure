@@ -1631,8 +1631,8 @@ if aros ; then
 fi
 
 if axrt ; then
-  extra_cflags="-D__AROS__ -I/usr/include/axrt -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -fno-common -Ilibdvdnav $extra_cflags"
-  extra_ldflags="$extra_ldflags -specs=/usr/lib/x86_64-linux-gnu/axrt.specs -lcybergraphics -lmui -lstdc.static -lstdc -lmuimaster -licon -lgraphics -lkeymap -llayers -ldos -lutility -lexec"
+  extra_cflags="-fPIC -I/usr/include/axrt-4.0 -specs=/usr/lib/x86_64-linux-gnu/axrt-4.0/axrt.specs -D__MORPHOS__ -DHAVE_SWAB -D_DEFAULT_SOURCE=1 -D__BSD_VISIBLE=1 -fno-strict-aliasing -fno-common -Ilibdvdnav $extra_cflags"
+  extra_ldflags="$extra_ldflags -shared -L/usr/lib/x86_64-linux-gnu/axrt-4.0"
   _axrt_objs=yes
 fi
 
@@ -2678,7 +2678,7 @@ if test "$cc_vendor" = "gnu" ; then
   cflag_check -fno-tree-vectorize && CFLAGS="$CFLAGS -fno-tree-vectorize"
 #  cflag_check -Wundef && WARNFLAGS="-Wundef $WARNFLAGS"
   cflag_check -std=gnu99 && WARN_CFLAGS="-std=gnu99 $WARN_CFLAGS"
-  cflag_check -Wdeclaration-after-statement && WARN_CFLAGS="-Wdeclaration-after-statement $WARN_CFLAGS"
+#  cflag_check -Wdeclaration-after-statement && WARN_CFLAGS="-Wdeclaration-after-statement $WARN_CFLAGS"
   cflag_check -Wno-pointer-sign && WARN_CFLAGS="-Wno-pointer-sign $WARN_CFLAGS"
   cflag_check -Wdisabled-optimization && WARN_CFLAGS="-Wdisabled-optimization $WARN_CFLAGS"
 #  cflag_check -Wmissing-prototypes && WARN_CFLAGS="-Wmissing-prototypes $WARN_CFLAGS"

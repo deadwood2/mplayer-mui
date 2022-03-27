@@ -747,7 +747,7 @@ OBJS_COMMON    += $(addsuffix .o, $(basename $(SRCS_COMMON)))
 OBJS_MENCODER  += $(addsuffix .o, $(basename $(SRCS_MENCODER)))
 OBJS_MPLAYER   += $(addsuffix .o, $(basename $(SRCS_MPLAYER)))
 OBJS_MPLAYER-$(PE_EXECUTABLE) += osdep/mplayer-rc.o
-OBJS_MPLAYER-$(AXRT_OBJS)     += /usr/lib/x86_64-linux-gnu/startup.o /usr/lib/x86_64-linux-gnu/axrt.ld
+OBJS_MPLAYER-$(AXRT_OBJS)     += /usr/lib/x86_64-linux-gnu/axrt-4.0/axrt.ld -specs=/usr/lib/x86_64-linux-gnu/axrt-4.0/axrt.specs
 OBJS_MPLAYER   += $(OBJS_MPLAYER-yes)
 
 MENCODER_DEPS = $(OBJS_MENCODER) $(OBJS_COMMON) $(COMMON_LIBS)
