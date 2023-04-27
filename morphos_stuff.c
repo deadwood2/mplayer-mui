@@ -1223,8 +1223,8 @@ void MorphOS_ParseArg(int argc, char *argv[], int *new_argc, char ***new_argv)
             MorphOS_argv[0] = malloc(strlen(WBStartup->sm_ArgList[0].wa_Name) + 1);
             if (!MorphOS_argv[0]) goto fail;
             strcpy(MorphOS_argv[0], WBStartup->sm_ArgList[0].wa_Name);
+            goto ok;
         }
-        goto ok;
 	}
 #endif
 #endif
