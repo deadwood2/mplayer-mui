@@ -11,3 +11,8 @@ runtime
 x86_64
 ./configure --target=x86_64-aros --disable-mencoder --enable-cross-compile --cc=/ssd/deadwood/mplayer-mui/x86_64-aros-gcc --host-cc=gcc --enable-runtime-cpudetection --enable-gui --disable-sdl --disable-unrarexec --enable-menu --enable-ass-internal --disable-openal --disable-protocol=libsmbclient --disable-protocol=libssh --disable-protocol=ffrtmpcrypt --disable-protocol=sctp --disable-decoder=h264_mmal --disable-decoder=h264_qsv --disable-decoder=h264_vda
 
+Additional libs beyond core SDK:
+
+iconv
+fontconfig
+
