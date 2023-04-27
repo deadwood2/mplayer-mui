@@ -22,7 +22,7 @@
 #include "input/mouse.h"
 #include "mp_fifo.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/intuition.h>
 #endif
 

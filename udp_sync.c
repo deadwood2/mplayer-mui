@@ -165,7 +165,7 @@ void send_udp(const char *send_to_ip, int port, char *mesg)
         // Enable broadcast
         setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &one, sizeof(one));
 
-#if defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__)
+#if defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__) || defined(__AROS__)
         socketinfo.sin_addr.s_addr = inet_addr(send_to_ip);
         ip_valid = socketinfo.sin_addr.s_addr != INADDR_NONE;
 #else

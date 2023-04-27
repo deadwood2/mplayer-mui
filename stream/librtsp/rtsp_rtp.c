@@ -304,7 +304,7 @@ rtp_connect (char *hostname, int port)
     sin.sin_addr.s_addr = htonl (INADDR_ANY);
   else
 #if HAVE_INET_PTON
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	{
 		long addr = inet_addr(hostname);
 		if (addr != INADDR_NONE)
@@ -410,7 +410,7 @@ is_multicast_address (char *addr)
     inet_aton (addr, &sin.sin_addr);
 #elif HAVE_WINSOCK2_H
     sin.sin_addr.s_addr = htonl (INADDR_ANY);
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	{
 		long addr2 = inet_addr(addr);
 		if (addr2 != INADDR_NONE)

@@ -84,7 +84,7 @@
 /*****************************************************************************
  * Device reading prototypes
  *****************************************************************************/
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/exec.h>
 #include <proto/dos.h>
 
@@ -140,7 +140,7 @@ int _dvdcss_use_ioctls( dvdcss_t dvdcss )
     {
         return 1;
     }
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 		// MorphOS supports ioctl :-) !!!!!!!!
 		return 1;
 #elif defined( SYS_OS2 )
@@ -426,7 +426,7 @@ int _dvdcss_open ( dvdcss_t dvdcss )
     }
     else
 #endif
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
    {
 		print_debug( dvdcss, "using Amiga-style for access" );
 		dvdcss->pf_seek  = amiga_seek;
@@ -495,7 +495,7 @@ int _dvdcss_close ( dvdcss_t dvdcss )
     }
 
     return 0;
-#elif __MORPHOS__
+#elif defined(__MORPHOS__) || defined(__AROS__)
 
 	if (dvdcss->DVD_BufPtr)
 	{
@@ -904,7 +904,7 @@ static int aspi_read ( dvdcss_t dvdcss, void *p_buffer, int i_blocks )
 }
 #endif
 
-#if !defined(__MORPHOS__)
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 /*****************************************************************************
  * Readv commands.
  *****************************************************************************/
@@ -1147,7 +1147,7 @@ static int aspi_read_internal( int i_fd, void *p_data, int i_blocks )
 /*****************************************************/
 /*****************************************************/
 /*****************************************************/
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include "../stream/amiga_scsi.h"
 
 struct MySCSICmd

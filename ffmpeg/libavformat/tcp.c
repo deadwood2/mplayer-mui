@@ -31,7 +31,7 @@
 #include <poll.h>
 #endif
 
-#if defined(__MORPHOS__) && !defined(__AROS__)
+#if defined(__MORPHOS__)
 enum
 {
   SHUT_RD = 0,		/* No more receptions.  */

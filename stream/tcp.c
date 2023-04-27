@@ -20,7 +20,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/socket.h>
 #include <proto/exec.h>
 #include <exec/types.h>
@@ -107,7 +107,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 #if HAVE_WINSOCK2_H
 	unsigned long val;
 	int to;
-#elif __MORPHOS__
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	char val;
 	struct timeval to;
 #else
@@ -159,7 +159,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 	if (inet_pton(af, host, our_s_addr)!=1)
 #elif HAVE_INET_ATON
 	if (inet_aton(host, our_s_addr)!=1)
-#elif HAVE_WINSOCK2_H || defined(__MORPHOS__)
+#elif HAVE_WINSOCK2_H || defined(__MORPHOS__) || defined(__AROS__)
 	if ( inet_addr(host)==INADDR_NONE )
 #endif
 	{
@@ -177,7 +177,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 		memcpy( our_s_addr, (void*)hp->h_addr_list[0], hp->h_length );
 	}
-#if defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__)
+#if defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__) || defined(__AROS__)
 	else {
 		unsigned long addr = inet_addr(host);
 		memcpy( our_s_addr, (void*)&addr, sizeof(addr) );
@@ -204,7 +204,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 #if HAVE_INET_PTON
 	inet_ntop(af, our_s_addr, buf, 255);
-#elif HAVE_INET_ATON || defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__)
+#elif HAVE_INET_ATON || defined(HAVE_WINSOCK2_H) || defined(__MORPHOS__) || defined(__AROS__)
 	av_strlcpy( buf, inet_ntoa( *((struct in_addr*)our_s_addr) ), 255);
 #endif
 	if(verb) mp_msg(MSGT_NETWORK,MSGL_STATUS,MSGTR_MPDEMUX_NW_ConnectingToServer, host, buf , port );
@@ -214,7 +214,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 	// Turn the socket as non blocking so we can timeout on the connection
 #if !HAVE_WINSOCK2_H
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	val = 1;
 	IoctlSocket( socket_server_fd, FIONBIO, &val );
 	errno=EINPROGRESS;
@@ -259,7 +259,7 @@ connect2Server_with_af(char *host, int port, int af,int verb) {
 
 	// Turn back the socket as blocking
 #if !HAVE_WINSOCK2_H
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	errno=0;
 	val = 0;
 	IoctlSocket( socket_server_fd, FIONBIO, &val );

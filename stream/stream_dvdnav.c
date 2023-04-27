@@ -38,7 +38,7 @@
 #include "help_mp.h"
 #include "stream_dvd_common.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/dos.h>
 extern APTR OldWinPtr;
 extern struct Process *MyProcess;
@@ -616,7 +616,7 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
   char *filename;
   dvdnav_priv_t *priv;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
   /* Disable requesters */
   OldWinPtr = MyProcess->pr_WindowPtr;
   MyProcess->pr_WindowPtr = (APTR)-1;
@@ -627,7 +627,7 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
   else filename = DEFAULT_DVD_DEVICE;
   if(!(priv=new_dvdnav_stream(filename))) {
     mp_msg(MSGT_OPEN,MSGL_ERR,MSGTR_CantOpenDVD,filename, strerror(errno));
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  /* Enable requesters */
 	  MyProcess->pr_WindowPtr = OldWinPtr;
 #endif
@@ -638,7 +638,7 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
     priv->title = p->track;
     if(dvdnav_title_play(priv->dvdnav, p->track) != DVDNAV_STATUS_OK) {
       mp_msg(MSGT_OPEN,MSGL_FATAL,"dvdnav_stream, couldn't select title %d, error '%s'\n", p->track, dvdnav_err_to_string(priv->dvdnav));
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  /* Enable requesters */
 	  MyProcess->pr_WindowPtr = OldWinPtr;
 #endif
@@ -672,7 +672,7 @@ static int open_s(stream_t *stream,int mode, void* opts, int* file_format) {
 
   mp_msg(MSGT_OPEN,MSGL_INFO, "Remember to disable MPlayer's cache when playing dvdnav:// streams (adding -nocache to your command line)\r\n");
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  /* Enable requesters */
 	  MyProcess->pr_WindowPtr = OldWinPtr;
 #endif

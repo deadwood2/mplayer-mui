@@ -138,14 +138,14 @@ inline static void cleanup(void); // Clean !
 
 static ao_info_t info = 
 {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	"AHI audio output using low-level API (MorphOS)",
 #else
    "AHI audio output using low-level API (AmigaOS)",
 #endif
 	"ahi",
 	"DET Nicolas",
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  "MorphOS Rulez :-)"
 #else
 	  "Amiga Survivor !",

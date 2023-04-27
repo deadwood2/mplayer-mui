@@ -20,7 +20,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/socket.h>
 #include <proto/exec.h>
 #include <exec/types.h>
@@ -130,7 +130,7 @@ const mime_struct_t mime_type_table[] = {
 streaming_ctrl_t *
 streaming_ctrl_new(void) {
 	streaming_ctrl_t *streaming_ctrl = calloc(1, sizeof(*streaming_ctrl));
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	if (!SocketBase)
 	{
 		if ( ! (SocketBase = OpenLibrary("bsdsocket.library", 0L) ) )
@@ -163,7 +163,7 @@ streaming_ctrl_free( streaming_ctrl_t *streaming_ctrl ) {
 	free(streaming_ctrl->buffer);
 	free(streaming_ctrl->data);
 	free(streaming_ctrl);
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	if(SocketBase)
 	{
 	  	CloseLibrary(SocketBase);
@@ -524,13 +524,13 @@ void fixup_network_stream_cache(stream_t *stream) {
       stream_cache_size = (stream->streaming_ctrl->prebuffer_size/1024)*5;
       if( stream_cache_size<64 ) stream_cache_size = 64;	// 16KBytes min buffer
     }
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
     mp_msg(MSGT_NETWORK,MSGL_INFO,MSGTR_MPDEMUX_NW_CacheSizeSetTo, stream_cache_size);
 #endif
   }
 }
 
-#if __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 void socket_block(int socket_fd, char val)
 {

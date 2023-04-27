@@ -117,7 +117,7 @@ typedef enum {
 	streaming_playing_e
 } streaming_status;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 #include <proto/exec.h>
 #include <exec/types.h>
@@ -186,7 +186,7 @@ typedef struct stream {
   quad_t pos,start_pos,end_pos;
   int eof;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
   struct CustomMsg *StartupMsg;     // <- free that at the end
   struct MsgPort * CacheTask_MsgPort;
 #endif
@@ -201,7 +201,7 @@ typedef struct stream {
 #endif
   unsigned char buffer[STREAM_BUFFER_SIZE>STREAM_MAX_SECTOR_SIZE?STREAM_BUFFER_SIZE:STREAM_MAX_SECTOR_SIZE];
   FILE *capture_file;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	void * mos_specific;	// MorphOS needs specific pointer in many case (AysncIO, VCD, DVD ...)
 #endif
 } stream_t;

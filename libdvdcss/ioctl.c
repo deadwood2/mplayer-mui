@@ -38,7 +38,7 @@
 #include <string.h>                                    /* memcpy(), memset() */
 #include <sys/types.h>
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/exec.h>
 #include <exec/types.h>
 #include <devices/scsidisk.h>
@@ -279,7 +279,7 @@ int ioctl_ReadCopyright( int i_fd, int i_layer, int *pi_copyright )
 
     *pi_copyright = p_buffer[ 4 ];
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[8];
 		struct SCSICmd MySCSICmd;
@@ -489,7 +489,7 @@ int ioctl_ReadDiscKey( int i_fd, int *pi_agid, uint8_t *p_key )
 
     memcpy( p_key, p_buffer + 4, DVD_DISCKEY_SIZE );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[ DVD_DISCKEY_SIZE + 4];
 		struct SCSICmd MySCSICmd;
@@ -691,7 +691,7 @@ int ioctl_ReadTitleKey( int i_fd, int *pi_agid, int i_pos, uint8_t *p_key )
 
     memcpy( p_key, p_buffer + 5, DVD_KEY_SIZE );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[12];
 		struct SCSICmd MySCSICmd;
@@ -855,7 +855,7 @@ int ioctl_ReportAgid( int i_fd, int *pi_agid )
 
     *pi_agid = p_buffer[ 7 ] >> 6;
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 	struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 	UBYTE buffer[8];
 	struct SCSICmd MySCSICmd;
@@ -1024,7 +1024,7 @@ int ioctl_ReportChallenge( int i_fd, int *pi_agid, uint8_t *p_challenge )
 
     memcpy( p_challenge, p_buffer + 4, DVD_CHALLENGE_SIZE );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[16];
 		struct SCSICmd MySCSICmd;
@@ -1192,7 +1192,7 @@ int ioctl_ReportASF( int i_fd, int *pi_remove_me, int *pi_asf )
 
     *pi_asf = p_buffer[ 7 ] & 1;
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[8];
 		struct SCSICmd MySCSICmd;
@@ -1356,7 +1356,7 @@ int ioctl_ReportKey1( int i_fd, int *pi_agid, uint8_t *p_key )
 
     memcpy( p_key, p_buffer + 4, DVD_KEY_SIZE );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[12];
 		struct SCSICmd MySCSICmd;
@@ -1503,7 +1503,7 @@ int ioctl_InvalidateAgid( int i_fd, int *pi_agid )
                         &sdc, sizeof(sdc), &ulParamLen,
                         NULL, 0, &ulDataLen);
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		struct SCSICmd MySCSICmd;
 
@@ -1671,7 +1671,7 @@ int ioctl_SendChallenge( int i_fd, int *pi_agid, uint8_t *p_challenge )
                          &sdc, sizeof(sdc), &ulParamLen,
                          p_buffer, sizeof(p_buffer), &ulDataLen );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[16];
 		struct SCSICmd MySCSICmd;
@@ -1847,7 +1847,7 @@ int ioctl_SendKey2( int i_fd, int *pi_agid, uint8_t *p_key )
                          &sdc, sizeof(sdc), &ulParamLen,
                          p_buffer, sizeof(p_buffer), &ulDataLen );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[12];
 		struct SCSICmd MySCSICmd;
@@ -2038,7 +2038,7 @@ int ioctl_ReportRPC( int i_fd, int *p_type, int *p_mask, int *p_scheme )
     *p_mask = p_buffer[ 5 ];
     *p_scheme = p_buffer[ 6 ];
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[12];
 		struct SCSICmd MySCSICmd;
@@ -2202,7 +2202,7 @@ int ioctl_SendRPC( int i_fd, int i_pdrc )
                          &sdc, sizeof(sdc), &ulParamLen,
                          p_buffer, sizeof(p_buffer), &ulDataLen );
 
-#elif defined ( __MORPHOS__)
+#elif defined (__MORPHOS__) || defined(__AROS__)
 		struct IOStdReq *IOReq = (struct IOStdReq *) i_fd;
 		UBYTE buffer[8];
 		struct SCSICmd MySCSICmd;

@@ -105,14 +105,14 @@ convop_t convop;
 
 static ao_info_t info =
 {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	"AHI audio output using low-level API (MorphOS)",
 #else
    "AHI audio output using low-level API (AmigaOS)",
 #endif
 	"ahi",
 	"Fabien Coeurjoly",
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  "MorphOS Rulez :-)"
 #else
 	  "Amiga Survivor !",

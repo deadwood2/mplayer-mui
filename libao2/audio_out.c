@@ -79,7 +79,7 @@ const ao_functions_t* const audio_out_drivers[] =
         &audio_out_oss,
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #if !defined(__AROS__)
    &audio_out_ahi,
 #endif

@@ -16,7 +16,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include "morphos_stuff.h"
 #include <proto/icon.h>
 #include <workbench/workbench.h>
@@ -45,7 +45,7 @@
 #include <windows.h>
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/dos.h>
 #undef lseek
 #undef truncate
@@ -153,7 +153,7 @@
 #include "stream/stream_dvd.h"
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 extern char * _ProgramName;
 #endif
@@ -351,7 +351,7 @@ static char *prog_path;
 static int crash_debug;
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern int altivec_disabled;
 APTR OldWinPtr;
 struct Process *MyProcess;
@@ -623,7 +623,7 @@ void uninit_player(unsigned int mask)
             free_demuxer(mpctx->demuxer);
         }
         mpctx->demuxer = NULL;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 		if (use_gui)
 			gui(GUI_SET_DEMUXER, NULL);
@@ -765,7 +765,7 @@ void exit_player_with_rc(enum exit_reason how, int rc)
 
     current_module = "exit_player";
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	// see morphos_stuff.c
 	MorphOS_Close();
 #endif
@@ -810,7 +810,7 @@ void exit_player(enum exit_reason how)
     exit_player_with_rc(how, 1);
 }
 
-#if !defined(__MINGW32__)  && !defined(__MORPHOS__)
+#if !defined(__MINGW32__)  && !defined(__MORPHOS__) && !defined(__AROS__)
 static void child_sighandler(int x)
 {
     pid_t pid;
@@ -842,7 +842,7 @@ static void exit_sighandler(int x)
         exit(1);
     if (sig_count > 6) {
         // can't stop :(
-#if !defined (_MINGW32) && !defined(__MORPHOS__)
+#if !defined (_MINGW32) && !defined(__MORPHOS__) && !defined(__AROS__)
         kill(getpid(), SIGKILL);
 #endif
     }
@@ -1118,7 +1118,7 @@ void add_subtitles(char *filename, float fps, int noerr)
     if (filename == NULL || mpctx->set_of_sub_size >= MAX_SUBTITLE_FILES)
         return;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  /* Disable requesters */
 	OldWinPtr = MyProcess->pr_WindowPtr;
 	MyProcess->pr_WindowPtr = (APTR)-1;
@@ -1142,7 +1142,7 @@ void add_subtitles(char *filename, float fps, int noerr)
         mp_msg(MSGT_CPLAYER, noerr ? MSGL_WARN : MSGL_ERR, MSGTR_CantLoadSub,
                filename_recode(filename));
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	    /* Enable requesters */
 	    MyProcess->pr_WindowPtr = OldWinPtr;
 #endif
@@ -1169,7 +1169,7 @@ static int add_vob_subtitle(const char *vobname, const char *const ifo, int forc
     if (!vobname)
         return 0;
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 	assert(!vo_vobsub);
 #else
 	if(vo_vobsub)
@@ -2623,7 +2623,7 @@ static void pause_loop(void)
             if (guiInfo.Playing != GUI_PAUSE || (rel_seek_secs || abs_seek_pos))
                 break;
         }
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 		else
 		{
             gui_handle_events(); /* AREXX HANDLING */
@@ -2831,7 +2831,7 @@ int main(int argc, char *argv[])
     int profile_config_loaded;
     int i;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	// see morphos_stuff.c
 	MyProcess = (struct Process *)FindTask(NULL);
 	if (MorphOS_Open(argc, argv) < 0) exit_player(EXIT_ERROR);
@@ -2871,7 +2871,7 @@ int main(int argc, char *argv[])
 		if(stristr(base, "gmplayer"))
 			use_gui=1;
 	}
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 	// Worbbench start...
 	// Program named gmplayer?
@@ -2922,7 +2922,7 @@ int main(int argc, char *argv[])
     }
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	{
 		int new_argc;
 		char **new_argv;
@@ -2985,7 +2985,7 @@ int main(int argc, char *argv[])
         play_tree_iter_free(mpctx->playtree_iter);
         mpctx->playtree_iter = NULL;
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
         if (getcwd(cwd, PATH_MAX) != (char *)NULL) {
             strcat(cwd, "/");
             // Prefix relative paths with current working directory
@@ -3110,7 +3110,7 @@ int main(int argc, char *argv[])
 #endif
     if (rtc_fd < 0)
 #endif /* HAVE_RTC */
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	mp_msg(MSGT_CPLAYER, MSGL_V, "Using timer.device timing\n");
 #else
     mp_msg(MSGT_CPLAYER, MSGL_V, "Using %s timing\n",
@@ -3159,7 +3159,7 @@ int main(int argc, char *argv[])
     current_module     = NULL;
 
     // Catch signals
-#if !defined (__MINGW32__) && !defined (__MORPHOS__)
+#if !defined (__MINGW32__) && !defined (__MORPHOS__) && !defined(__AROS__)
     signal(SIGCHLD, child_sighandler);
 #endif
 
@@ -3256,7 +3256,7 @@ play_next_file:
         while (!(cmd = mp_input_get_cmd(0, 1, 0))) { // wait for command
             if (mpctx->video_out && vo_config_count)
                 mpctx->video_out->check_events();
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 			gui_handle_events(); /* AREXX HANDLING */
 #endif
             usec_sleep(20000);
@@ -3338,13 +3338,13 @@ play_next_file:
 //==================== Open VOB-Sub ============================
 
     current_module = "vobsub";
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	    /* Disable requesters */
 	    OldWinPtr = MyProcess->pr_WindowPtr;
 	    MyProcess->pr_WindowPtr = (APTR)-1;
 #endif
     load_vob_subtitle(filename, spudec_ifo, &vo_spudec, add_vob_subtitle);
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
     /* Enable requesters */
     MyProcess->pr_WindowPtr = OldWinPtr;
 #endif
@@ -3479,7 +3479,7 @@ play_next_file:
     }
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
   if(use_gui && (mpctx->stream->type==STREAMTYPE_DVD || mpctx->stream->type==STREAMTYPE_DVDNAV))
   {
@@ -3497,7 +3497,7 @@ play_next_file:
 // CACHE2: initial prefill: 20%  later: 5%  (should be set by -cacheopts)
 goto_enable_cache:
     if (stream_cache_size > 0) {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
         mp_msg(MSGT_NETWORK,MSGL_INFO,MSGTR_MPDEMUX_NW_CacheSizeSetTo, stream_cache_size);
 #endif
 
@@ -3719,7 +3719,7 @@ goto_enable_cache:
         init_vo_spudec(mpctx->stream, mpctx->sh_video, mpctx->d_sub ? mpctx->d_sub->sh : NULL);
     }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	/* Disable requesters */
 	OldWinPtr = MyProcess->pr_WindowPtr;
 	MyProcess->pr_WindowPtr = (APTR)-1;
@@ -3738,7 +3738,7 @@ goto_enable_cache:
         initialized_flags |= INITIALIZED_SUBS;
     }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	/* Enable requesters */
 	MyProcess->pr_WindowPtr = OldWinPtr;
 #endif
@@ -3934,7 +3934,7 @@ goto_enable_cache:
 
 /*========================== PLAY AUDIO ============================*/
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 		    if (SetSignal(0L, SIGBREAKF_CTRL_C) & SIGBREAKF_CTRL_C)
 		    {
 				extern struct Process *cachetask;
@@ -3963,7 +3963,7 @@ goto_enable_cache:
                 if (!quiet)
                     print_status(a_pos, 0, 0);
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 				gui_handle_events(); /* AREXX HANDLING */
 #endif
 
@@ -4218,7 +4218,7 @@ goto_enable_cache:
                     dvd_priv_t *dvdp = mpctx->stream->priv;
                     guiInfo.Chapter = dvd_chapter_from_cell(dvdp, guiInfo.Track - 1, dvdp->cur_cell) + 1;
                 }
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 				if (mpctx->stream->type == STREAMTYPE_DVDNAV) {
 					guiInfo.Chapter = demuxer_get_current_chapter(mpctx->demuxer);
 				}

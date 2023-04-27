@@ -28,7 +28,7 @@
 #include <unistd.h>
 #include <limits.h>
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <dos/dos.h>
 #include <dos/dosextens.h>
 #include <proto/dos.h>
@@ -155,7 +155,7 @@ static int mylstat(char *dir, char *file,struct stat* st) {
     strcpy(s, dir);
 #if HAVE_DOS_PATHS
     if (s[l] == '/' || s[l] == '\\')
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	if (s[l] == '/' || s[l] == ':')
 #else
     if (s[l] == '/')
@@ -165,7 +165,7 @@ static int mylstat(char *dir, char *file,struct stat* st) {
 #if HAVE_DOS_PATHS
     if (!slash)
       slash = strrchr(s,'\\');
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
     if (!slash)
 	  slash = strrchr(s,':');
 #endif
@@ -175,7 +175,7 @@ static int mylstat(char *dir, char *file,struct stat* st) {
     return stat(s,st);
   }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
   strcpy(s, dir);
   AddPart(s, file, sizeof(s));
 #else
@@ -299,7 +299,7 @@ static int open_dir(menu_t* menu,char* args) {
 	if(dp->d_name[0] == '.' && strcmp(dp->d_name,"../") != 0)
       continue;
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
     if (menu_chroot && !strcmp (dp->d_name,"..")) {
       size_t len = strlen (menu_chroot);
       if ((strlen (mpriv->dir) == len || strlen (mpriv->dir) == len + 1)
@@ -494,7 +494,7 @@ static void read_cmd(menu_t* menu,int cmd) {
 	char *slash =  NULL, *p = NULL;
 
 	if(strcmp(mpriv->p.current->p.txt,"../") == 0) {
-//#ifndef __MORPHOS__
+//#if !defined(__MORPHOS__) #ifndef __MORPHOS__#ifndef __MORPHOS__ !defined(__AROS__)
 	  if(l <= 1) break;
 	  mpriv->dir[l-1] = '\0';
 //#endif
@@ -502,7 +502,7 @@ static void read_cmd(menu_t* menu,int cmd) {
 #if HAVE_DOS_PATHS
 	  if (!slash)
 	    slash = strrchr(mpriv->dir,'\\');
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	  if (!slash)
 		slash = strrchr(mpriv->dir,':');
 #endif
@@ -519,7 +519,7 @@ static void read_cmd(menu_t* menu,int cmd) {
 	  p = strdup(mpriv->dir);
 	} else {
 	  p = malloc(l + strlen(mpriv->p.current->p.txt) + 2);
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  strcpy(p, mpriv->dir);
 	  AddPart(p, mpriv->p.current->p.txt, l + strlen(mpriv->p.current->p.txt) + 2);
 #else
@@ -538,7 +538,7 @@ static void read_cmd(menu_t* menu,int cmd) {
       char filename[fname_len];
       char *str;
       char *action = mpriv->p.current->d ? mpriv->dir_action:mpriv->file_action;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  strcpy(filename, mpriv->dir);
 	  AddPart(filename, mpriv->p.current->p.txt, fname_len);
 #else
@@ -554,7 +554,7 @@ static void read_cmd(menu_t* menu,int cmd) {
 	int fname_len = strlen(mpriv->dir) + strlen(mpriv->p.current->p.txt) + 2;
     char filename[fname_len];
     char *str;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	  strcpy(filename, mpriv->dir);
 	  AddPart(filename, mpriv->p.current->p.txt, fname_len);
 #else
@@ -644,7 +644,7 @@ static int open_fs(menu_t* menu, char* args) {
   }
 
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
   if (path[0] != '/') {
     if(path[strlen(path)-1] != '/')
       snprintf(b,sizeof(b),"%s/%s/",wd,path);

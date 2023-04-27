@@ -25,7 +25,7 @@ CpuCaps gCpuCaps;
 
 #include <stdlib.h>
 
-#if defined(__MORPHOS__) && !defined(__AROS__)
+#if defined(__MORPHOS__)
 #include <proto/exec.h>
 #include <exec/execbase.h>
 #include <exec/system.h>

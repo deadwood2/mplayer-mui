@@ -72,7 +72,7 @@
 #include "libavutil/avstring.h"
 #include "edl.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/dos.h>
 #endif
 
@@ -943,7 +943,7 @@ static int mp_property_audio(m_option_t *prop, int action, void *arg,
                 reinit_audio_chain();
             }
         }
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 		if (use_gui)
 			gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATEAUDIO);
@@ -1615,7 +1615,7 @@ static int mp_property_sub(m_option_t *prop, int action, void *arg,
         pts = mpctx->sh_video->pts;
     update_subtitles(mpctx->sh_video, pts, d_sub, 1);
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 	if (use_gui)
 		gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATESUBTITLE);
@@ -3189,7 +3189,7 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
                     mpctx->sub_counts[SUB_SOURCE_SUBS]++;
                     ++mpctx->global_sub_size;
                 }
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 				if (use_gui)
 					gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATESUBTITLE);
@@ -3206,7 +3206,7 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
                 } else if (v < mpctx->set_of_sub_size) {
                     remove_subtitle_range(mpctx, v, 1);
                 }
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #ifdef CONFIG_GUI
 				if (use_gui)
 					gui(GUI_RUN_COMMAND, (void *) MP_CMD_GUI_UPDATESUBTITLE);
@@ -3392,7 +3392,7 @@ int run_command(MPContext *mpctx, mp_cmd_t *cmd)
             break;
 
         case MP_CMD_RUN:
-#if defined(__MORPHOS__)
+#if defined(__MORPHOS__) || defined(__AROS__)
 		mp_msg(MSGT_GLOBAL, MSGL_INFO, "Executing <%s>\n", cmd->args[0].v.s);
 		Execute(cmd->args[0].v.s, NULL, Output());
 #elif  !defined(__MINGW32)

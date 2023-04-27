@@ -1626,12 +1626,12 @@ if aros || axrt ; then
 fi
 
 if aros ; then
-  extra_cflags="-nix -D__MORPHOS__ -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -fno-common -Iaros/include -Ilibdvdnav $extra_cflags"
+  extra_cflags="-nix -DHAVE_SWAB -D__BSD_VISIBLE=1 -fno-strict-aliasing -fno-common -Iaros/include -Ilibdvdnav $extra_cflags"
   extra_ldflags="$extra_ldflags -nix -lcybergraphics"
 fi
 
 if axrt ; then
-  extra_cflags="-fPIC -I/usr/include/axrt-4.0 -specs=/usr/lib/x86_64-linux-gnu/axrt-4.0/axrt.specs -D__MORPHOS__ -DHAVE_SWAB -D_DEFAULT_SOURCE=1 -D__BSD_VISIBLE=1 -fno-strict-aliasing -fno-common -Ilibdvdnav $extra_cflags"
+  extra_cflags="-fPIC -I/usr/include/axrt-4.0 -specs=/usr/lib/x86_64-linux-gnu/axrt-4.0/axrt.specs -D__AROS__ -DHAVE_SWAB -D_DEFAULT_SOURCE=1 -D__BSD_VISIBLE=1 -fno-strict-aliasing -fno-common -Ilibdvdnav $extra_cflags"
   extra_ldflags="$extra_ldflags -shared -L/usr/lib/x86_64-linux-gnu/axrt-4.0"
   _axrt_objs=yes
 fi

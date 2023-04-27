@@ -19,7 +19,7 @@
 #ifndef MPLAYER_GUI_APP_H
 #define MPLAYER_GUI_APP_H
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 #include "util/bitmap.h"
 #include "wm/ws.h"
 #endif
@@ -100,7 +100,7 @@ typedef struct {
     const char *name;
 } evName;
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 /* Skin items */
 
 #define itNone      0
@@ -183,7 +183,7 @@ typedef struct {
 } guiItems;
 #endif
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 extern guiItems guiApp;
 
 wItem *appFindItem(int event);

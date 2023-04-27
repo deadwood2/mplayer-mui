@@ -44,7 +44,7 @@
 #include "vcd_read_darwin.h"
 #elif defined(__MINGW32__) || defined(__CYGWIN__)
 #include "vcd_read_win32.h"
-/*#elif defined(__MORPHOS__)
+/*#elif defined(__MORPHOS__) || defined(__AROS__)
 #include "vcd_read_amiga.h" */
 #elif defined(__OS2__)
 #include "vcd_read_os2.h"

@@ -51,7 +51,7 @@ extern char *gtkAOOSSMixer;
 extern char *gtkAOOSSMixerChannel;
 extern char *gtkAOOSSDevice;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern int    gui_window_dimensions;
 extern int    gui_show_gui;
 extern int    gui_show_status;

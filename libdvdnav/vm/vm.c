@@ -47,7 +47,7 @@
 #include "vm.h"
 #include "dvdnav_internal.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/exec.h>
 //#include <proto/dos.h>
 #undef Exit
@@ -184,7 +184,7 @@ static int os2_open(const char *name, int oflag)
 #endif
 
 void dvd_read_name(char *name, char *serial, const char *device) {
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
     /* Because we are compiling with _FILE_OFFSET_BITS=64
      * all off_t are 64bit.
      */
@@ -2114,7 +2114,7 @@ void vm_position_print(vm_t *vm, vm_position_t *position) {
 /*****************************************************/
 /*****************************************************/
 /*****************************************************/
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include "amiga_scsi.h"
 
 struct MySCSICmd

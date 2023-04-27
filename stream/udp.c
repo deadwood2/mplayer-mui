@@ -100,7 +100,7 @@ udp_open_socket (URL_t *url)
     inet_aton (url->hostname, &server_address.sin_addr);
 #elif !HAVE_WINSOCK2_H
     server_address.sin_addr.s_addr = htonl(INADDR_ANY);
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	{
 		long addr = inet_addr(url->hostname);
 		if (addr != INADDR_NONE)

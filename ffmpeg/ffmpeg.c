@@ -103,7 +103,7 @@
 
 #include "libavutil/avassert.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <exec/types.h>
 struct Library *ffmpegSocketBase;
 #endif

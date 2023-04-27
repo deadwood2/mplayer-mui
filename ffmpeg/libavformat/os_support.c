@@ -40,7 +40,7 @@
 #include <sys/select.h>
 #endif /* HAVE_WINSOCK2_H */
 #endif /* !HAVE_POLL_H */
-#if defined(__MORPHOS__) && !defined(__AROS__)
+#if defined(__MORPHOS__)
 #include <sys/filio.h>
 #endif
 #if defined(__AROS__)
@@ -263,7 +263,7 @@ int ff_socket_nonblock(int socket, int enable)
 #if HAVE_WINSOCK2_H
     u_long param = enable;
     return ioctlsocket(socket, FIONBIO, &param);
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
     char on = (char) enable;
     return MyIoctlSocket(socket, FIONBIO, (char *)&on);
     return 0;

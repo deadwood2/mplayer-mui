@@ -1070,7 +1070,7 @@ fail:
   return STREAM_UNSUPPORTED;
 }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <dos/dos.h>
 #include <proto/dos.h>
 #endif

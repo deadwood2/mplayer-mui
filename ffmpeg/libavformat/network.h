@@ -21,7 +21,7 @@
 #ifndef AVFORMAT_NETWORK_H
 #define AVFORMAT_NETWORK_H
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #undef SOCKET_BASE_NAME
 #define SOCKET_BASE_NAME ffmpegSocketBase
 extern struct Library *ffmpegSocketBase;
@@ -78,7 +78,7 @@ int ff_neterrno(void);
 #include <poll.h>
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/exec.h>
 #include <stdarg.h>
 #include <proto/socket.h>

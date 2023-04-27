@@ -29,7 +29,7 @@
 #include <errno.h>
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include "morphos_stuff.h"
 #endif
 

@@ -38,7 +38,7 @@
 #else
 #include <winsock2.h>
 #endif
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 #include <unistd.h>
 #endif
 #include <stdio.h>

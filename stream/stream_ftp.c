@@ -32,7 +32,7 @@
 #include <winsock2.h>
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern struct Library *SocketBase;
 #endif
 
@@ -386,7 +386,7 @@ static void close_f(stream_t *s) {
 
   m_struct_free(&stream_opts,p);
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	if(SocketBase)
 	{
 	  	CloseLibrary(SocketBase);
@@ -403,7 +403,7 @@ static int open_f(stream_t *stream,int mode, void* opts, int* file_format) {
   struct stream_priv_s* p = (struct stream_priv_s*)opts;
   char str[256],rsp_txt[256];
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
    if (!SocketBase)
 	  if ( ! (SocketBase = OpenLibrary("bsdsocket.library", 0L) ) ) return STREAM_ERROR;
 #endif

@@ -26,7 +26,7 @@
 #include "libavutil/mem.h"
 #include "libavutil/time.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #define D(x) x
 #endif
 
@@ -149,7 +149,7 @@ int ff_network_init(void)
         return 0;
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
     if(!ffmpegSocketBase)
     {
 		D(kprintf("Opening ffmpeg socketbase\n"));
@@ -204,7 +204,7 @@ void ff_network_close(void)
     WSACleanup();
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
     if(ffmpegSocketBase)
     {
 		D(kprintf("Closing ffmpeg socketbase\n"));

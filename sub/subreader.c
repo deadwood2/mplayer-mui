@@ -1904,7 +1904,7 @@ static int compare_sub_priority(const void *a, const void *b)
     } else if (((const subfn*)a)->priority < ((const subfn*)b)->priority) {
 	return 1;
     } else {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	return strcmp(((subfn*)a)->fname, ((subfn*)b)->fname);
 #else
 	return strcoll(((const subfn*)a)->fname, ((const subfn*)b)->fname);
@@ -1912,7 +1912,7 @@ static int compare_sub_priority(const void *a, const void *b)
     }
 }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/dos.h>
 #include <dos/dos.h>
 #endif

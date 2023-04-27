@@ -24,7 +24,7 @@
 #include "config.h"
 
 //#define HAVE_TERMCAP
-#if !defined(__OS2__) && !defined(__MORPHOS__)
+#if !defined(__OS2__) && !defined(__MORPHOS__) && !defined(__AROS__)
 #define CONFIG_IOCTL
 #endif
 
@@ -160,7 +160,7 @@ void getch2(void)
 {
 	int retval;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	return;
 #endif
 	
@@ -278,7 +278,7 @@ void getch2(void)
 static int getch2_status=0;
 
 void getch2_enable(void){
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	return ;
 #endif
 #ifdef HAVE_TERMIOS
@@ -294,7 +294,7 @@ struct termios tio_new;
 }
 
 void getch2_disable(void){
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	return ;
 #endif
     if(!getch2_status) return; // already disabled / never enabled

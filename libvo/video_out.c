@@ -112,7 +112,7 @@ extern const vo_functions_t video_out_zr;
 extern const vo_functions_t video_out_zr2;
 extern const vo_functions_t video_out_bl;
 extern const vo_functions_t video_out_fbdev2;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern vo_functions_t video_out_cgx_overlay;
 extern vo_functions_t video_out_cgx_vmem;
 extern vo_functions_t video_out_cgx_wpa;

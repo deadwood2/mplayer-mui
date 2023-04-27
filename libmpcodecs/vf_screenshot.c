@@ -109,7 +109,7 @@ static int fexists(char *fname)
     else return 0;
 }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern char * filename;
 #include <proto/dos.h>
 #endif
@@ -117,7 +117,7 @@ extern char * filename;
 static void gen_fname(struct vf_priv_s* priv)
 {
 	do {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	char buf[sizeof(priv->fname) - 13];
 	stccpy(buf, FilePart(filename), sizeof(buf));
 	snprintf (priv->fname, sizeof(priv->fname), "RAM:%s.%04d.png", buf, ++priv->frameno);
@@ -131,7 +131,7 @@ static void gen_fname(struct vf_priv_s* priv)
 	}
 
 	mp_msg(MSGT_VFILTER,MSGL_INFO,"*** screenshot '%s' ***\n",priv->fname);
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	mp_msg(MSGT_VFILTER,MSGL_STATUS,"Saved screenshot to '%s'\n",priv->fname);
 #endif
 }

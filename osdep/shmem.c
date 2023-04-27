@@ -139,7 +139,7 @@ void shmem_free(void* p,int64_t size){
 
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -177,7 +177,7 @@ void shmem_free(void* p,int64_t size){
 static int shmem_type=0;
 
 void* shmem_alloc(int size){
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 return malloc ( size );
 
@@ -236,7 +236,7 @@ while(1){
 }
 
 void shmem_free(void* p, int size){
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
    free(p);
 #else
   switch(shmem_type){

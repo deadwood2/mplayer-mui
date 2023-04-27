@@ -16,7 +16,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include "morphos_stuff.h"
 #include <proto/dos.h>
 #include <dos/dos.h>
@@ -110,7 +110,7 @@ int vo_doublebuffering=0;
 int vo_directrendering=0;
 int vo_config_count=1;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern int altivec_disabled;
 APTR OldWinPtr;
 struct Process *MyProcess;
@@ -265,7 +265,7 @@ static int edl_seek_type; ///< When non-zero, frames are discarded instead of se
     else
 	mp_msg(MSGT_MENCODER, MSGL_INFO, MSGTR_Exiting);
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	MorphOS_Close();
 #endif
 
@@ -594,7 +594,7 @@ audio_encoder_t *aencoder = NULL;
 
 user_correct_pts = 0;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	// see morphos_stuff.c
 	MyProcess = (struct Process *)FindTask(NULL);
 	if (MorphOS_Open(argc, argv) < 0) mencoder_exit(1, NULL);

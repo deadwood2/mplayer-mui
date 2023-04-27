@@ -30,7 +30,7 @@
 
 struct iovec;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 // Needed for MsgPort and IORequest
 #include <exec/ports.h>
 #include <exec/io.h>
@@ -74,7 +74,7 @@ struct dvdcss_s
     int    i_readv_buf_size;
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 		struct MsgPort *  DVD_MsgPort;
 		struct IOStdReq * DVD_IOReq;
 		APTR DVD_BufPtr;

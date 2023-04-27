@@ -53,7 +53,7 @@
 #include "libpostproc/postprocess.h"
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern int cache_network;
 #endif
 
@@ -323,7 +323,7 @@ const m_option_t common_opts[] = {
     {"nocache", &stream_cache_size, CONF_TYPE_FLAG, 0, 1, 0, NULL},
     {"cache-min", &stream_cache_min_percent, CONF_TYPE_FLOAT, CONF_RANGE, 0, 99, NULL},
     {"cache-seek-min", &stream_cache_seek_min_percent, CONF_TYPE_FLOAT, CONF_RANGE, 0, 99, NULL},
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	{"cachenetwork", &cache_network, CONF_TYPE_FLAG, 0, 1, 0, NULL},
 #endif
 #else
@@ -655,7 +655,9 @@ const m_option_t common_opts[] = {
     {"nofontconfig", "MPlayer was compiled without fontconfig support.\n", CONF_TYPE_PRINT, CONF_NOCFG, 0, 0, NULL},
 #endif /* CONFIG_FONTCONFIG */
 
+#if defined(__MORPHOS)
 	{"noaltivec", &altivec_disabled, CONF_TYPE_FLAG, 0, 0, 1, NULL},
+#endif
 	
 	{NULL, NULL, 0, 0, 0, 0, NULL}
 };

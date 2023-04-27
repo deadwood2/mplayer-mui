@@ -36,7 +36,7 @@
 #include "m_config.h"
 #include "parser-mecmd.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern void mencoder_exit(int level, const char *how);
 #endif
 

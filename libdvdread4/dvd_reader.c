@@ -67,7 +67,7 @@ static inline int _private_gettimeofday( struct timeval *tv, void *tz )
 #include <paths.h>
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #define fchdir chdir
 #endif
 
@@ -339,7 +339,7 @@ static char *bsd_block2char( const char *path )
 }
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <dos/dos.h>
 #include <proto/dos.h>
 #include <proto/exec.h>
@@ -379,7 +379,7 @@ dvd_reader_t *DVDOpen( const char *ppath )
   }
 #endif
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
   ret = stat( path, &fileinfo );
 
   if( ret < 0 ) {
@@ -456,7 +456,7 @@ dvd_reader_t *DVDOpen( const char *ppath )
       return NULL;
     }
 
-#if !defined(WIN32) && !defined(__MORPHOS__) /* don't have fchdir, and getcwd( NULL, ... ) is strange */
+#if !defined(WIN32) && !defined(__MORPHOS__) && !defined(__AROS__) /* don't have fchdir, and getcwd( NULL, ... ) is strange */
               /* Also WIN32 does not have symlinks, so we don't need this bit of code. */
 
     /* Resolve any symlinks and get the absolute dir name. */

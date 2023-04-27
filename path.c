@@ -40,7 +40,7 @@
 #elif defined(__CYGWIN__)
 #include <windows.h>
 #include <sys/cygwin.h>
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/dos.h>
 #endif
 
@@ -51,7 +51,7 @@ char *get_path(const char *filename){
 	char *buff;
 #ifdef __MINGW32__
 	static char *config_dir = "/mplayer";
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	static char * const config_dir = "conf";
 	homedir = "PROGDIR:";
 #else
@@ -67,7 +67,7 @@ char *get_path(const char *filename){
 	char *bdl_url_path = NULL;
 #endif
 
-#ifndef __MORPHOS__
+#if !defined(__MORPHOS__) && !defined(__AROS__)
 	if ((homedir = getenv("MPLAYER_HOME")) != NULL)
 		config_dir = "";
 	else if ((homedir = getenv("HOME")) == NULL)
@@ -183,7 +183,7 @@ void set_path_env(void)
 }
 #endif /* (defined(__MINGW32__) || defined(__CYGWIN__)) && defined(CONFIG_WIN32DLL) */
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #define BINARY_CODECS_PATH "PROGDIR:"
 #endif
 
@@ -212,7 +212,7 @@ const char *mp_basename(const char *path)
 {
     char *s;
 
-#if HAVE_DOS_PATHS || defined(__MORPHOS__)
+#if HAVE_DOS_PATHS || defined(__MORPHOS__) || defined(__AROS__)
     s = strrchr(path, '\\');
     if (s)
         path = s + 1;
@@ -241,7 +241,7 @@ char *mp_dirname(const char *path)
 
     if (len == 0)
 	{
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 		char currentdir[1024];
 		GetCurrentDirName(currentdir, sizeof(currentdir));
 		return strdup(currentdir);
@@ -271,7 +271,7 @@ char *mp_dirname(const char *path)
  */
 char *mp_path_join(const char *base, const char *path)
 {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 	char *ret, *tmp;
 	int len;
 
@@ -323,7 +323,7 @@ char *mp_path_join(const char *base, const char *path)
  */
 char *mp_dir_join(const char *dir, const char *append)
 {
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
     char *tmp, *ret;
     size_t dirlen = strlen(dir);
     size_t i      = dirlen - 1;

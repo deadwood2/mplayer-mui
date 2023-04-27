@@ -52,13 +52,13 @@ char *      (*dvdinput_error) (dvd_input_t);
 /* dlopening libdvdcss */
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
-#elif __MORPHOS__
+#elif defined(__MORPHOS__) || defined(__AROS__)
 #else
 /* Only needed on MINGW at the moment */
 #include "../../msvc/contrib/dlfcn.c"
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #define HAVE_DVDCSS_DVDCSS_H 1
 #endif
 
@@ -370,7 +370,7 @@ int dvdinput_setup(void)
   }
 }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 void dvdinput_setup_file_access(void)
 {
     dvdinput_open  = file_open;

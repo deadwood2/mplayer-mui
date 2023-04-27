@@ -76,7 +76,7 @@ extern const stream_info_t stream_info_smb;
 extern const stream_info_t stream_info_sdp;
 extern const stream_info_t stream_info_rtsp_sip;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern stream_info_t stream_info_asyncio;
 extern stream_info_t stream_info_vcd_morphos;
 #endif
@@ -93,14 +93,14 @@ extern const stream_info_t stream_info_bluray;
 static const stream_info_t* const auto_open_streams[] = {
   &stream_info_bd,
 #ifdef CONFIG_VCD
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
   &stream_info_vcd_morphos,
 #else
   &stream_info_vcd,
 #endif
 #endif
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 //	&stream_info_asyncio,
 #endif
 

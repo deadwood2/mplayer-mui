@@ -56,7 +56,7 @@ static void ThreadProc( void *s );
 #elif defined(PTHREAD_CACHE)
 #include <pthread.h>
 static void *ThreadProc(void *s);
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 #else
 #include <sys/wait.h>
 #define FORKED_CACHE 1
@@ -72,7 +72,7 @@ static void *ThreadProc(void *s);
 #include "cache2.h"
 #include "mp_global.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 #include <errno.h>
 #include <time.h>
@@ -150,7 +150,7 @@ typedef struct {
   volatile double stream_time_pos;
 } cache_vars_t;
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 void force_exit(void)
 {
@@ -493,7 +493,7 @@ static cache_vars_t* cache_init(int64_t size,int sector){
   return s;
 }
 
-#if defined(__MORPHOS__)
+#if defined(__MORPHOS__) || defined(__AROS__)
 extern void gdvdcss_open(void);
 extern void gdvdcss_close(void);
 #endif
@@ -501,9 +501,9 @@ extern void gdvdcss_close(void);
 void cache_uninit(stream_t *s) {
   cache_vars_t* c = s->cache_data;
   if(s->cache_pid) {
-#if !FORKED_CACHE && !defined(__MORPHOS__)
+#if !FORKED_CACHE && !defined(__MORPHOS__) && !defined(__AROS__)
     cache_do_control(s, -2, NULL);
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
     // Tell cachetask to quit
 	DEBUG(kprintf("%s Signal end task\n", CURRENT_TASK));
     Signal((struct Task *) cachetask, SIGBREAKF_CTRL_E|SIGBREAKF_CTRL_C);
@@ -570,12 +570,12 @@ void cache_uninit(stream_t *s) {
   c->stream = NULL;
   shared_free(s->cache_data, sizeof(cache_vars_t));
   s->cache_data = NULL;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
   DEBUG(kprintf("%s cache_uninit done\n", CURRENT_TASK));
 #endif
 }
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 
 void interrupt_handler(int sig)
 {
@@ -816,7 +816,7 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
     stream->cache_pid = _beginthread( ThreadProc, 0, s );
 #elif defined(__OS2__)
     stream->cache_pid = _beginthread( ThreadProc, NULL, 256 * 1024, s );
-#elif defined(__MORPHOS__)
+#elif defined(__MORPHOS__) || defined(__AROS__)
 	DEBUG(kprintf("%s buffer_size = %d seek_limit = %d fill_limit = %d min = %d\n", CURRENT_TASK, s->buffer_size, s->seek_limit, s->fill_limit, min));
 
 	if (!(stream->StartupMsg = (struct CustomMsg *) AllocVec( sizeof(struct CustomMsg), MEMF_PUBLIC ) ) )return -1;

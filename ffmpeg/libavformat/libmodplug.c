@@ -225,7 +225,7 @@ static int modplug_read_header(AVFormatContext *s)
     avpriv_set_pts_info(st, 64, 1, 1000);
     st->duration = ModPlug_GetLength(modplug->f);
     st->codec->codec_type  = AVMEDIA_TYPE_AUDIO;
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
     st->codec->codec_id    = AV_CODEC_ID_PCM_S16BE;
 #else
     st->codec->codec_id    = AV_CODEC_ID_PCM_S16LE;

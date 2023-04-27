@@ -44,7 +44,7 @@
 #include "input/input.h"
 #include "osdep/timer.h"
 
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 #include <proto/dos.h>
 #endif
 
@@ -243,7 +243,7 @@ static void draw(menu_t* menu, mp_image_t* mpi) {
 }
 
 static void check_child(menu_t* menu) {
-#if !defined(__MINGW32__) && !defined(__MORPHOS__)
+#if !defined(__MINGW32__) && !defined(__MORPHOS__) && !defined(__AROS__)
   fd_set rfd;
   struct timeval tv;
   int max_fd = mpriv->child_fd[2] > mpriv->child_fd[1] ? mpriv->child_fd[2] :
@@ -297,7 +297,7 @@ static void check_child(menu_t* menu) {
 #define close_pipe(pipe) close(pipe[0]); close(pipe[1])
 
 static int run_shell_cmd(menu_t* menu, char* cmd) {
-#if defined(__MORPHOS__)
+#if defined(__MORPHOS__) || defined(__AROS__)
   BPTR out;
 
   mp_msg(MSGT_GLOBAL,MSGL_INFO,MSGTR_LIBMENU_ConsoleRun,cmd);
@@ -427,7 +427,7 @@ static void read_cmd(menu_t* menu,int cmd) {
     enter_cmd(menu);
     if(!c)
 	{
-#ifdef __MORPHOS__
+#if defined(__MORPHOS__) || defined(__AROS__)
 		char * ptr;
 		if((ptr=strchr(mpriv->cur_history->prev->buffer, ' ')))
 		{
