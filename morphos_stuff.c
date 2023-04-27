@@ -1087,11 +1087,11 @@ void rexx_handle_events (void)
 /**********************************************************************************************************************/
 
 #ifdef __AROS__
-#define BUILD_DATE "29.03.2022"
+#define BUILD_DATE "27.04.2023"
 #define VERSION ""
-const char version[] = "$VER: MPlayer 1.1 ("BUILD_DATE") © MPlayer Team";
-const char muiversion[] = "$VER: MPlayer 1.1 ("BUILD_DATE")";
-const char muititle[] = "MPlayer 1.1 ("BUILD_DATE") "VERSION;
+const char version[] = "$VER: MPlayer 1.2 ("BUILD_DATE") © MPlayer Team";
+const char muiversion[] = "$VER: MPlayer 1.2 ("BUILD_DATE")";
+const char muititle[] = "MPlayer 1.2 ("BUILD_DATE") "VERSION;
 const char revision[] = VERSION;
 #else
 const char version[]    = "$VER: MPlayer 1.0 (25.09.2011) © MPlayer Team, Nicolas Det, Fabien Coeurjoly [SVN: r34123]";
