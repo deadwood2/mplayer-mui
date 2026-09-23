@@ -323,6 +323,11 @@ static int cache_fill(cache_vars_t *s)
 
   DEBUG(kprintf("%s cache_fill before read\n", CURRENT_TASK));
 
+#if defined(__MORPHOS__) || defined(__AROS__)
+  if (SetSignal(0L, 0L) & (SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_E))
+      return 0;
+#endif
+
   if (wraparound_copy) {
     int to_copy;
     len = stream_read_internal(s->stream, s->stream->buffer, space);
@@ -683,11 +688,11 @@ fail:
 		if(fd != -1)
 		{
 			DEBUG(kprintf("%s ReleaseCopyOfsocket\n", CURRENT_TASK));
-			fdkey = ReleaseCopyOfSocket(s->stream->fd, time(NULL));
+			fdkey = ReleaseSocket(s->stream->fd, time(NULL));
 
 			if(fdkey == -1)
 			{
-				DEBUG(kprintf("%s ReleaseCopyOfSocket failed\n", CURRENT_TASK));
+				DEBUG(kprintf("%s ReleaseSocket failed\n", CURRENT_TASK));
 			}
 		}
 
@@ -836,7 +841,7 @@ int stream_enable_cache(stream_t *stream,int64_t size,int64_t min,int64_t seek_l
 		 oldSocketBase = SocketBase;
 
 		 // prepare to pass socket to cachetask
-		 fdkey = ReleaseCopyOfSocket(stream->fd, time(NULL));
+		 fdkey = ReleaseSocket(stream->fd, time(NULL));
 
 		 if(fdkey == -1)
 		 {
