@@ -619,7 +619,7 @@ void CacheTask(void) {
 			SocketBase = newSocketBase;
 
 			//if(1)
-			if(SocketBaseTags(SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (ULONG) &errno, SBTM_SETVAL(SBTC_LOGTAGPTR), (ULONG) "MPlayer", TAG_DONE) == 0)
+			if(SocketBaseTags(SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (IPTR) &errno, SBTM_SETVAL(SBTC_LOGTAGPTR), (IPTR) "MPlayer", TAG_DONE) == 0)
 			{
 				// Get socket from main thread
 				fd = ObtainSocket(fdkey, AF_INET, SOCK_STREAM, 0); /* what about sock_dgram ? */

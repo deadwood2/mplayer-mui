@@ -140,7 +140,7 @@ streaming_ctrl_new(void) {
 		else
 		{
 			if(0)
-			//if(SocketBaseTags(SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (ULONG) &errno, SBTM_SETVAL(SBTC_LOGTAGPTR), (ULONG) "MPlayer", TAG_DONE))
+			//if(SocketBaseTags(SBTM_SETVAL(SBTC_ERRNOPTR(sizeof(errno))), (IPTR) &errno, SBTM_SETVAL(SBTC_LOGTAGPTR), (IPTR) "MPlayer", TAG_DONE))
 			{
 				CloseLibrary(SocketBase);
 				SocketBase = NULL;
